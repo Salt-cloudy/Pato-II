@@ -887,6 +887,26 @@ document.addEventListener('keydown',function(e){
   else if(e.key==='Escape')closeLightbox();
 });
 function lbBgClick(e){if(e.target===document.getElementById('lightbox'))closeLightbox();}
+// Touch swipe navigation for lightbox
+let _lbTx=0,_lbTy=0;
+document.getElementById('lightbox').addEventListener('touchstart',function(e){
+  if(e.touches.length===1){_lbTx=e.touches[0].clientX;_lbTy=e.touches[0].clientY;}
+},{passive:true});
+document.getElementById('lightbox').addEventListener('touchmove',function(e){
+  if(lbZoomed||e.touches.length!==1)return;
+  const dx=e.touches[0].clientX-_lbTx;
+  const dy=e.touches[0].clientY-_lbTy;
+  if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>10)e.preventDefault();
+},{passive:false});
+document.getElementById('lightbox').addEventListener('touchend',function(e){
+  if(lbZoomed||lbImgs.length<2)return;
+  const dx=e.changedTouches[0].clientX-_lbTx;
+  const dy=e.changedTouches[0].clientY-_lbTy;
+  if(Math.abs(dx)>50&&Math.abs(dx)>Math.abs(dy)){
+    if(dx<0)lbNext();else lbPrev();
+    e.preventDefault();
+  }
+});
 // THEME
 function toggleSettings(){
   const p=document.getElementById('settings-panel');
