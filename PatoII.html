@@ -369,7 +369,10 @@ html.light .disease-item.active{background:#3b7dd812}
       <div id="quiz-question">
         <div class="qz-header">
           <span class="qz-organ" id="qz-organ"></span>
-          <span class="qz-counter" id="qz-counter"></span>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="btn-back" style="padding:5px 14px;font-size:.8rem" onclick="backToConfig()">Menú</button>
+            <span class="qz-counter" id="qz-counter"></span>
+          </div>
         </div>
         <div class="qz-img-wrap">
           <img class="qz-img" id="qz-img" src="" alt="Imagen histológica" onclick="openLightbox(this.src)">
@@ -382,18 +385,7 @@ html.light .disease-item.active{background:#3b7dd812}
             <button class="qz-reveal-btn" onclick="revealDiag()">Ver respuesta</button>
             <div class="qz-answer-reveal" id="qz-diag-ans"></div>
           </div>
-          <div class="qz-section">
-            <div class="qz-q">2. Menciona 3 características microscópicas de esta lesión:</div>
-            <textarea class="qz-open" id="qz-micro-input" placeholder="Escribe tu respuesta aquí..."></textarea>
-            <button class="qz-reveal-btn" onclick="revealMicro()">Ver respuesta</button>
-            <div class="qz-answer-reveal" id="qz-micro-ans"></div>
-          </div>
-          <div class="qz-section">
-            <div class="qz-q" id="qz-q3">3. ¿Qué pregunta variable aplica aquí?</div>
-            <textarea class="qz-open" id="qz-var-input" placeholder="Escribe tu respuesta..."></textarea>
-            <button class="qz-reveal-btn" onclick="revealQ3()">Ver respuesta</button>
-            <div class="qz-answer-reveal" id="qz-var-ans"></div>
-          </div>
+
         </div>
         <div class="qz-footer">
           <div class="qz-marks">
@@ -611,7 +603,7 @@ const imagesMap = {
   'tumor_saco_vitelino':["claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/6-ovario/tumores del saco vitelino/tumores_del_saco_vitelino01.jpeg","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/6-ovario/tumores del saco vitelino/tumores_del_saco_vitelino02.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/6-ovario/tumores del saco vitelino/tumores_del_saco_vitelino03.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/6-ovario/tumores del saco vitelino/tumores_del_saco_vitelino04.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/6-ovario/tumores del saco vitelino/tumores_del_saco_vitelino05.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/6-ovario/tumores del saco vitelino/tumores_del_saco_vitelino06.png"],
   'leiomioma':["claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/7-miometrio/leiomioma/leiomioma01.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/7-miometrio/leiomioma/leiomioma02.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/7-miometrio/leiomioma/leiomioma03.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/7-miometrio/leiomioma/leiomioma04.png"],
   'leiomiosarcoma':["claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/7-miometrio/leiomiosarcoma/leiomiosarcoma_01.jpeg","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/7-miometrio/leiomiosarcoma/leiomiosarcoma_02.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/7-miometrio/leiomiosarcoma/leiomiosarcoma_03.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/7-miometrio/leiomiosarcoma/leiomiosarcoma_04.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/7-miometrio/leiomiosarcoma/leiomiosarcoma_05.png"],
-  'sarcoma_estroma_endometrial':["claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/7-miometrio/sarcoma del estroma endometrial/Sarcoma_del_estroma_endometrial01.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/7-miometrio/sarcoma del estroma endometrial/Sarcoma_del_estroma_endometrial02.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/7-miometrio/sarcoma del estroma endometrial/Sarcoma_del_estroma_endometrial03.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/7-miometrio/sarcoma del estroma endometrial/Sarcoma_del_estroma_endometrial04.png"],
+  'sarcoma_estroma_endometrial':["claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/7-miometrio/sarcoma del estroma endometrial/Sarcoma_del_estroma_endometrial01.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/7-miometrio/sarcoma del estroma endometrial/Sarcoma_del_estroma_endometrial02.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/7-miometrio/sarcoma del estroma endometrial/Sarcoma_del_estroma_endometrial03.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/7-miometrio/sarcoma del estroma endometrial/Sarcoma_del_estroma_endometrial04.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/7-miometrio/sarcoma del estroma endometrial/Sarcoma_del_estroma_endometrial05.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/7-miometrio/sarcoma del estroma endometrial/Sarcoma_del_estroma_endometrial06.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/7-miometrio/sarcoma del estroma endometrial/Sarcoma_del_estroma_endometrial07.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/7-miometrio/sarcoma del estroma endometrial/Sarcoma_del_estroma_endometrial08.png"],
   'angiosarcoma_mama':["claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/Angiosarcoma de mama/Angiosarcoma_de_mama_alto_grado01.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/Angiosarcoma de mama/Angiosarcoma_de_mama_alto_grado02.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/Angiosarcoma de mama/Angiosarcoma_de_mama_bajo_grado01.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/Angiosarcoma de mama/Angiosarcoma_de_mama_bajo_grado02.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/Angiosarcoma de mama/Angiosarcoma_de_mama_bajo_grado03.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/Angiosarcoma de mama/Angiosarcoma_de_mama_grado_intermedio01.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/Angiosarcoma de mama/Angiosarcoma_de_mama_grado_intermedio02.png"],
   'mastitis_linfocitica':["claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/Mastitis linfocitica o mastopatia diabetica/mastitis_linfocitica01.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/Mastitis linfocitica o mastopatia diabetica/mastitis_linfocitica02.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/Mastitis linfocitica o mastopatia diabetica/mastitis_linfocitica03.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/Mastitis linfocitica o mastopatia diabetica/mastitis_linfocitica04.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/Mastitis linfocitica o mastopatia diabetica/mastitis_linfocitica05.png"],
   'adenosis_esclerosante_mama':["claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/adenosis esclerosante de mama/adenosis_esclerosante_de_mama01.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/adenosis esclerosante de mama/adenosis_esclerosante_de_mama02.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/adenosis esclerosante de mama/adenosis_esclerosante_de_mama03.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/adenosis esclerosante de mama/adenosis_esclerosante_de_mama04.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/adenosis esclerosante de mama/adenosis_esclerosante_de_mama05.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/adenosis esclerosante de mama/adenosis_esclerosante_de_mama06.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/adenosis esclerosante de mama/adenosis_esclerosante_de_mama07.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/adenosis esclerosante de mama/adenosis_esclerosante_de_mama08.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/adenosis esclerosante de mama/adenosis_esclerosante_de_mama09.png","claude pc/data actualizada de pato 2 (usa esta)/imagenes microscopicas/femenino/8-mama/adenosis esclerosante de mama/adenosis_esclerosante_de_mama10.png"],
@@ -1159,16 +1151,7 @@ function renderQ(){
   document.getElementById('qz-diag-input').value='';
   document.getElementById('qz-diag-ans').textContent=d.name;
   document.getElementById('qz-diag-ans').style.display='none';
-  // Q2 — all microscopic characteristics
-  document.getElementById('qz-micro-input').value='';
-  document.getElementById('qz-micro-ans').textContent=d.imageFindings.map((f,i)=>i+1+'. '+f).join('\n');
-  document.getElementById('qz-micro-ans').style.display='none';
-  // Q3 — open answer
-  const qv=d.quizVar;
-  document.getElementById('qz-q3').textContent='3. '+qv.q;
-  document.getElementById('qz-var-input').value='';
-  document.getElementById('qz-var-ans').textContent=qv.opts[qv.answer];
-  document.getElementById('qz-var-ans').style.display='none';
+
 }
 
 
