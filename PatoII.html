@@ -1227,6 +1227,7 @@ buildSystemFilter();
 buildOrganFilter();
 buildSidebar();
 updateProgress();
+setInterval(checkAccess,4*60*60*1000);
 
 // Touch swipe navigation for lightbox
 var _lbTx=0,_lbTy=0;
