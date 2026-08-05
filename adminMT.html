@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MT Admin">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="apple-touch-icon-mt.png">
+<title>Admin — Pato II MT</title>
+<style>
+:root{--bg:#13131f;--card:#1c1c2e;--border:#2a2a42;--accent:#e07020;--green:#4caf50;--red:#e53935;--yellow:#ffc107;--text:#e8e8f0;--text2:#8888aa;--text3:#44445a}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* LOCK */
+#lock{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg);padding:16px}
+.lock-box{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:40px 36px;width:320px;max-width:100%;text-align:center}
+.lock-icon{font-size:2.2rem;margin-bottom:10px}
+.lock-title{font-size:1.15rem;font-weight:700;color:var(--accent);margin-bottom:4px}
+.lock-sub{font-size:.78rem;color:var(--text2);margin-bottom:24px}
+.lock-inp{width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:1rem;text-align:center;letter-spacing:3px;margin-bottom:12px}
+.lock-inp:focus{outline:none;border-color:var(--accent)}
+.lock-btn{width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:.95rem;font-weight:600;cursor:pointer;touch-action:manipulation}
+.lock-btn:hover{opacity:.88}
+.lock-err{color:var(--red);font-size:.82rem;margin-top:10px;min-height:18px}
+
+/* LAYOUT */
+#admin{display:none}
+.topbar{background:var(--card);border-bottom:1px solid var(--border);padding:0 20px;height:54px;display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:100}
+.topbar-title{font-weight:700;color:var(--accent);font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.online-pill{background:#4caf5015;color:var(--green);border:1px solid #4caf5030;padding:4px 12px;border-radius:20px;font-size:.78rem;font-weight:600;flex-shrink:0;white-space:nowrap}
+
+/* TABS */
+.tabbar{background:var(--card);border-bottom:1px solid var(--border);display:flex;padding:0 12px;position:sticky;top:54px;z-index:99;overflow-x:auto;-ms-overflow-style:none;scrollbar-width:none}
+.tabbar::-webkit-scrollbar{display:none}
+.tab{padding:12px 14px;background:none;border:none;color:var(--text2);cursor:pointer;font-size:.85rem;border-bottom:2px solid transparent;transition:.15s;white-space:nowrap;flex-shrink:0;touch-action:manipulation}
+.tab:hover{color:var(--text)}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.bdg{display:inline-flex;align-items:center;justify-content:center;background:var(--red);color:#fff;border-radius:10px;font-size:.62rem;font-weight:700;min-width:16px;height:16px;padding:0 4px;margin-left:4px;vertical-align:middle}
+.bdg:empty{display:none}
+.bdg-y{background:var(--yellow);color:#000}
+
+/* CONTENT */
+.pane{display:none;padding:20px;max-width:1200px;margin:0 auto}
+.pane.on{display:block}
+
+/* STATS GRID */
+.sg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px}
+.sc{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center}
+.sn{font-size:1.9rem;font-weight:700;color:var(--accent)}
+.sl{font-size:.73rem;color:var(--text2);margin-top:4px}
+
+/* SECTION HEADER */
+.sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.sh h2{font-size:.95rem;font-weight:600}
+.sh-hint{font-size:.73rem;color:var(--text3)}
+
+/* TABLE */
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:8px}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:9px 12px;font-size:.74rem;color:var(--text2);font-weight:600;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:9px 12px;font-size:.82rem;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#ffffff04}
+tr.clickrow{cursor:pointer}
+
+/* CHECKBOX */
+input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--accent);flex-shrink:0}
+
+/* PILLS */
+.pill{display:inline-block;padding:2px 9px;border-radius:10px;font-size:.7rem;font-weight:600}
+.g{background:#4caf5018;color:var(--green)}
+.r{background:#e5393518;color:var(--red)}
+.y{background:#ffc10718;color:var(--yellow)}
+.gr{background:#44445a30;color:var(--text2)}
+
+/* BUTTONS */
+.btn{padding:6px 13px;border-radius:7px;border:none;cursor:pointer;font-size:.8rem;font-weight:600;transition:.15s;touch-action:manipulation;min-height:34px}
+.btn-p{background:var(--accent);color:#fff}
+.btn-p:hover{opacity:.85}
+.btn-d{background:#e5393518;color:var(--red);border:1px solid #e5393530}
+.btn-d:hover{background:#e5393528}
+.btn-s{background:#ffffff12;color:var(--text2)}
+.btn-s:hover{background:#ffffff20}
+.btn-w{background:#ffc10718;color:var(--yellow);border:1px solid #ffc10730}
+.btn-w:hover{background:#ffc10728}
+.btn-g{background:#4caf5018;color:var(--green);border:1px solid #4caf5030}
+.btn-g:hover{background:#4caf5028}
+.gap{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+
+/* BULK ACTION BAR */
+.bulk-bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--accent);border-radius:12px;padding:12px 18px;display:none;gap:10px;align-items:center;z-index:200;box-shadow:0 4px 28px rgba(0,0,0,.6);flex-wrap:wrap;justify-content:center;max-width:92vw}
+.bulk-bar.on{display:flex}
+.bulk-n{font-size:.84rem;color:var(--text2);white-space:nowrap}
+.bulk-n b{color:var(--accent)}
+
+/* MODAL */
+.ov{display:none;position:fixed;inset:0;background:#000c;z-index:500;align-items:center;justify-content:center;padding:16px}
+.ov.op{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:26px;width:380px;max-width:100%}
+.modal h3{margin-bottom:16px;color:var(--accent);font-size:1rem}
+.fg{margin-bottom:13px}
+.fg label{display:block;font-size:.75rem;color:var(--text2);margin-bottom:5px}
+.fg input,.fg select{width:100%;padding:9px 11px;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:.88rem}
+.fg input:focus,.fg select:focus{outline:none;border-color:var(--accent)}
+.mact{display:flex;gap:9px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+.merr{color:var(--red);font-size:.78rem;min-height:16px;margin-top:8px}
+
+/* ALERT ITEMS */
+.ai{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px 15px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:flex-start;cursor:pointer;transition:.15s;gap:10px}
+.ai.unread{border-left:3px solid var(--red)}
+.ai-title{font-size:.85rem;font-weight:600;color:var(--red);margin-bottom:3px}
+.ai-det{font-size:.76rem;color:var(--text2)}
+.ai-time{font-size:.72rem;color:var(--text3);white-space:nowrap;flex-shrink:0}
+
+/* DEVICE LIST IN MODAL */
+.dev-list{max-height:180px;overflow-y:auto;margin-top:8px}
+.dev-row{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg);border-radius:7px;margin-bottom:6px;font-size:.79rem;gap:8px}
+.dev-id{color:var(--text2);font-family:monospace;font-size:.7rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+
+/* EMPTY */
+.empty{text-align:center;color:var(--text3);padding:28px 16px;font-size:.84rem}
+
+/* MOBILE RESPONSIVE */
+@media(max-width:600px){
+  .topbar{padding:0 12px;height:48px}
+  .topbar-title{font-size:.85rem}
+  .online-pill{font-size:.69rem;padding:3px 8px}
+  .tab{padding:10px 11px;font-size:.78rem}
+  .pane{padding:12px 10px}
+  .sg{grid-template-columns:1fr 1fr;gap:9px}
+  .sc{padding:12px 8px}
+  .sn{font-size:1.5rem}
+  .sl{font-size:.68rem}
+  th,td{padding:8px 8px;font-size:.76rem}
+  .modal{padding:20px 14px;max-height:88vh;overflow-y:auto}
+  .ov{align-items:flex-start;padding-top:24px}
+  .mact{justify-content:stretch}
+  .mact .btn{flex:1;text-align:center}
+  .btn{font-size:.77rem;padding:7px 11px;min-height:38px}
+  .bulk-bar{bottom:calc(12px + env(safe-area-inset-bottom,0px));padding:10px 14px;gap:8px}
+  .bulk-n{font-size:.78rem}
+  .sh h2{font-size:.88rem}
+  .sh-hint{display:none}
+  .ai{flex-direction:column}
+  .col-hide,.col-hide-ses,.col-hide-cod{display:none!important}
+  .lock-box{padding:32px 22px}
+  /* Estadisticas: tarjetas */
+  #stats .tw{overflow-x:visible}
+  #stats thead{display:none}
+  #stb tr{display:grid;grid-template-columns:1fr 1fr;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;gap:2px 12px}
+  #stb td{border:none;padding:2px 0;font-size:.8rem}
+  #stb tr:last-child td{border-bottom:none}
+  #stb td:first-child{grid-column:1/-1;font-size:.88rem;font-weight:600;padding-bottom:7px;border-bottom:1px solid var(--border);margin-bottom:3px}
+  #stb td[data-label]::before{content:attr(data-label);display:block;font-size:.61rem;color:var(--text2);margin-bottom:1px}
+  /* Codigos: botones compactos */
+  .btn-txt{display:none}
+  #ctb .gap{gap:4px}
+  #ctb .btn{padding:6px 10px;min-height:36px}
+}
+</style>
+</head>
+<body>
+
+<!-- LOCK -->
+<div id="lock">
+  <div class="lock-box">
+    <div class="lock-icon">🔐</div>
+    <div class="lock-title">Pato II MT</div>
+    <div class="lock-sub">Panel de Administración</div>
+    <input type="password" id="li" class="lock-inp" placeholder="Contraseña">
+    <button class="lock-btn" onclick="login()">Entrar</button>
+    <div id="le" class="lock-err"></div>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div id="admin">
+  <div class="topbar">
+    <span class="topbar-title">🧬 Pato II MT — Admin</span>
+    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <span class="online-pill">⬤ <span id="oc">0</span> en línea</span>
+      <button class="btn btn-s" onclick="logout()" style="font-size:.72rem;padding:4px 10px;min-height:28px">Cerrar sesión</button>
+    </div>
+  </div>
+  <div class="tabbar">
+    <button class="tab on" onclick="tab(this,'dash')">Dashboard</button>
+    <button class="tab" onclick="tab(this,'users')">Usuarios</button>
+    <button class="tab" onclick="tab(this,'archived')">Archivados <span class="bdg bdg-y" id="arch-bdg"></span></button>
+    <button class="tab" onclick="tab(this,'codes')">Códigos</button>
+    <button class="tab" onclick="tab(this,'stats')">Estadísticas</button>
+    <button class="tab" id="atab" onclick="tab(this,'alerts')">Alertas <span class="bdg" id="ab"></span></button>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dash" class="pane on">
+    <div class="sg">
+      <div class="sc"><div class="sn" id="s-online">0</div><div class="sl">En línea ahora</div></div>
+      <div class="sc"><div class="sn" id="s-idle" style="color:#e07020">0</div><div class="sl">Idle (20+ min)</div></div>
+      <div class="sc"><div class="sn" id="s-active">0</div><div class="sl">Usuarios activos</div></div>
+      <div class="sc"><div class="sn" id="s-codes">0</div><div class="sl">Códigos activos</div></div>
+      <div class="sc"><div class="sn" id="s-alerts">0</div><div class="sl">Alertas sin leer</div></div>
+    </div>
+    <div style="padding:0 16px 16px">
+      <button id="btn-force-reload" class="btn btn-s" onclick="forceReloadAll()" style="background:#e07020;color:#fff;border:none;padding:8px 18px;border-radius:8px;font-size:.85rem;cursor:pointer;font-weight:600">↻ Actualizar a todos</button>
+      <span id="force-reload-msg" style="margin-left:10px;font-size:.8rem;color:var(--sub)"></span>
+    </div>
+    <div class="sh"><h2>Usuarios en línea ahora</h2></div>
+    <div id="online-list"><p class="empty">Nadie conectado.</p></div>
+  </div>
+
+  <!-- USUARIOS -->
+  <div id="users" class="pane">
+    <div class="sh">
+      <h2>Usuarios activos</h2>
+      <span class="sh-hint">Doble clic → archivar</span>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th style="width:30px"><input type="checkbox" id="sel-all" onchange="selAllUsers(this)"></th>
+          <th>Nombre</th>
+          <th>Último acceso</th>
+          <th class="col-hide-ses">Sesiones</th>
+          <th class="col-hide">Primer acceso</th>
+          <th>Estado</th>
+          <th class="col-hide">Device ID</th>
+        </tr></thead>
+        <tbody id="utb"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ARCHIVADOS -->
+  <div id="archived" class="pane">
+    <div class="sh">
+      <h2>Usuarios archivados</h2>
+      <span class="sh-hint">Doble clic → restaurar / eliminar</span>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th style="width:30px"><input type="checkbox" id="arch-sel-all" onchange="selAllArchived(this)"></th>
+          <th>Nombre</th>
+          <th>Último acceso</th>
+          <th class="col-hide-ses">Sesiones</th>
+          <th class="col-hide">Primer acceso</th>
+          <th class="col-hide">Device ID</th>
+        </tr></thead>
+        <tbody id="archtb"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- CÓDIGOS -->
+  <div id="codes" class="pane">
+    <div class="sh">
+      <h2>Códigos de acceso</h2>
+      <button class="btn btn-p" onclick="openCreate()">+ Nuevo código</button>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th>Nombre</th>
+          <th class="col-hide-cod">Código</th>
+          <th>Vence</th>
+          <th>Dispositivos</th>
+          <th class="col-hide">Máx</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr></thead>
+        <tbody id="ctb"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ESTADÍSTICAS -->
+  <div id="stats" class="pane">
+    <div class="sg" style="margin-bottom:20px">
+      <div class="sc"><div class="sn" id="st-total">0</div><div class="sl">Usuarios totales</div></div>
+      <div class="sc"><div class="sn" id="st-archived">0</div><div class="sl">Archivados</div></div>
+    </div>
+    <div class="sh"><h2>Estadísticas por usuario activo</h2></div>
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th>Nombre</th>
+          <th>Clics</th>
+          <th>Sesiones</th>
+          <th>Tiempo total</th>
+          <th class="col-hide">Idle total</th>
+          <th class="col-hide">Sesión más larga</th>
+          <th>Último acceso</th>
+          <th>Interacciones en modo estudio</th>
+          <th class="col-hide">Quiz</th>
+          <th>Dominé</th>
+          <th>Me falta</th>
+          <th>🔬 Micro</th>
+          <th class="col-hide">↺ Otra vez</th>
+
+        </tr></thead>
+        <tbody id="stb"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ALERTAS -->
+  <div id="alerts" class="pane">
+    <div class="sh">
+      <h2>Intentos no autorizados</h2>
+      <button class="btn btn-s" onclick="markAll()">Marcar todas leídas</button>
+    </div>
+    <div id="alist"><p class="empty">Sin alertas.</p></div>
+  </div>
+</div>
+
+<!-- BULK ACTION BAR -->
+<div class="bulk-bar" id="bulk-bar">
+  <span class="bulk-n"><b id="bulk-n">0</b> seleccionados</span>
+  <button class="btn btn-w" id="bulk-main" onclick="bulkMain()">Archivar</button>
+  <button class="btn btn-d" onclick="bulkDelete()">Eliminar</button>
+  <button class="btn btn-s" onclick="clearSelection()">Cancelar</button>
+</div>
+
+<!-- MODAL CREAR CÓDIGO -->
+<div class="ov" id="m-create">
+  <div class="modal">
+    <h3>Nuevo código de acceso</h3>
+    <div class="fg"><label>Nombre del usuario</label><input type="text" id="cn" placeholder="Ej: Juan García"></div>
+    <div class="fg"><label>Código de acceso</label><input type="text" id="cc" placeholder="Ej: AMIGO01" oninput="this.value=this.value.toUpperCase()"></div>
+    <div class="fg"><label>Fecha de vencimiento</label><input type="date" id="ce"></div>
+    <div class="fg"><label>Dispositivos permitidos</label><input type="number" id="cm" value="1" min="1" max="10"></div>
+    <div class="merr" id="cerr"></div>
+    <div class="mact">
+      <button class="btn btn-s" onclick="closeM('m-create')">Cancelar</button>
+      <button class="btn btn-p" onclick="createCode()">Crear</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR CÓDIGO -->
+<div class="ov" id="m-edit">
+  <div class="modal">
+    <h3>Editar código — <span id="en"></span></h3>
+    <div class="fg"><label>Nombre</label><input type="text" id="ename"></div>
+    <div class="fg"><label>Fecha de vencimiento</label><input type="date" id="eexp"></div>
+    <div class="fg"><label>Dispositivos permitidos (máx)</label><input type="number" id="emax" min="1" max="10"></div>
+    <div class="fg">
+      <label>Dispositivos registrados</label>
+      <div class="dev-list" id="edevs"></div>
+    </div>
+    <div class="merr" id="eerr"></div>
+    <div class="mact">
+      <button class="btn btn-s" onclick="closeM('m-edit')">Cancelar</button>
+      <button class="btn btn-p" onclick="saveEdit()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ACCIÓN USUARIO -->
+<div class="ov" id="m-action">
+  <div class="modal" style="width:320px;text-align:center">
+    <h3 id="act-name" style="margin-bottom:10px"></h3>
+    <p id="act-desc" style="font-size:.83rem;color:var(--text2);margin-bottom:20px;line-height:1.5"></p>
+    <div class="mact" style="justify-content:center">
+      <button class="btn btn-s" onclick="closeM('m-action')">Cancelar</button>
+      <button class="btn btn-g" id="act-btn2" style="display:none"></button>
+      <button class="btn" id="act-btn"></button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js';
+import { getDatabase, ref, set, get, remove, push, update, onValue, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js';
+import { getAuth as getFbAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
+
+const OWNER = '6a2a2864e53dbc588b114249d0868192f897d386e2712163c6a6c164f537a0d9';
+const AUTH_KEY = 'pato2_admin_auth';
+const COOKIE_NAME = 'pato2_admin';
+
+function setAuth(hash) {
+  const exp = new Date(); exp.setFullYear(exp.getFullYear() + 1);
+  document.cookie = `${COOKIE_NAME}=${hash};expires=${exp.toUTCString()};path=/;SameSite=Strict`;
+  try { localStorage.setItem(AUTH_KEY, hash); } catch(e) {}
+}
+function getAuth() {
+  const m = document.cookie.match(new RegExp('(?:^|; )' + COOKIE_NAME + '=([^;]+)'));
+  if (m) return m[1];
+  try { return localStorage.getItem(AUTH_KEY); } catch(e) { return null; }
+}
+function clearAuth() {
+  document.cookie = `${COOKIE_NAME}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;SameSite=Strict`;
+  try { localStorage.removeItem(AUTH_KEY); } catch(e) {}
+}
+const cfg = {
+  apiKey:"AIzaSyAtjVvtxiJRysVxV9LyGLcv20-4Vj5xJpI",
+  authDomain:"pato-ii-mt.firebaseapp.com",
+  databaseURL:"https://pato-ii-mt-default-rtdb.firebaseio.com",
+  projectId:"pato-ii-mt",
+  storageBucket:"pato-ii-mt.firebasestorage.app",
+  messagingSenderId:"375391431391",
+  appId:"1:375391431391:web:8dc94aee26ecc12736d76a"
+};
+const app = initializeApp(cfg);
+const db = getDatabase(app);
+const fbAuth = getFbAuth(app);
+const ADMIN_EMAIL = 'admin@pato-ii-mt.local';
+
+async function sha256(m){
+  const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(m));
+  return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+function fmt(ts){
+  if(!ts)return'—';
+  const d=new Date(ts);
+  return d.toLocaleDateString('es',{day:'2-digit',month:'2-digit',year:'2-digit'})+' '+d.toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});
+}
+function fmtTime(s){
+  if(!s||s<1)return'—';
+  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60);
+  if(h>0)return`${h}h ${m}m`;
+  if(m>0)return`${m}m`;
+  return`${s}s`;
+}
+
+function showAdmin(){
+  document.getElementById('lock').style.display='none';
+  document.getElementById('admin').style.display='block';
+  init();
+}
+
+onAuthStateChanged(fbAuth, user => {
+  if(user && getAuth()===OWNER) showAdmin();
+});
+
+window.login=async function(){
+  const v=document.getElementById('li').value.trim();
+  if(!v)return;
+  const h=await sha256(v.toUpperCase());
+  if(h===OWNER){
+    setAuth(h);
+    try {
+      await signInWithEmailAndPassword(fbAuth, ADMIN_EMAIL, v);
+    } catch(err) {
+      try {
+        await createUserWithEmailAndPassword(fbAuth, ADMIN_EMAIL, v);
+      } catch(err2) {
+        console.error('Firebase Auth setup failed:', err2);
+      }
+    }
+    showAdmin();
+  } else {
+    document.getElementById('le').textContent='Contraseña incorrecta.';
+  }
+};
+document.getElementById('li').addEventListener('keydown',e=>{if(e.key==='Enter')window.login();});
+
+let D={codes:{},devices:{},codeDevices:{},presence:{},alerts:{},sessions:{},microStats:{},userStats:{}};
+let currentTab='dash';
+
+function init(){
+  onValue(ref(db,'presence'),s=>{D.presence=s.val()||{};render();});
+  onValue(ref(db,'devices'),s=>{D.devices=s.val()||{};render();});
+  onValue(ref(db,'codes'),s=>{D.codes=s.val()||{};render();});
+  onValue(ref(db,'codeDevices'),s=>{D.codeDevices=s.val()||{};render();});
+  onValue(ref(db,'alerts'),s=>{D.alerts=s.val()||{};renderAlerts();});
+  onValue(ref(db,'sessions'),s=>{D.sessions=s.val()||{};renderStats();});
+  onValue(ref(db,'microStats'),s=>{D.microStats=s.val()||{};renderStats();});
+  onValue(ref(db,'userStats'),s=>{D.userStats=s.val()||{};renderStats();});
+}
+
+function render(){ renderDash();renderUsers();renderArchived();renderCodes();renderStats(); }
+
+/* ── DASHBOARD ── */
+function renderDash(){
+  const now=new Date();
+  const onl=Object.values(D.presence).filter(p=>p.online).length;
+  const idl=Object.values(D.presence).filter(p=>!p.online&&p.status==='idle').length;
+  // Usuarios activos = no archivados con código vigente (o dueño sin codeHash)
+  const activeUsers=Object.values(D.devices).filter(d=>{
+    if(d.archived)return false;
+    if(!d.codeHash)return true;
+    const code=D.codes[d.codeHash];
+    return code&&new Date(code.expires)>now;
+  }).length;
+  const activeCodes=Object.values(D.codes).filter(c=>new Date(c.expires)>now).length;
+  document.getElementById('oc').textContent=onl;
+  document.getElementById('s-online').textContent=onl;
+  if(document.getElementById('s-idle'))document.getElementById('s-idle').textContent=idl;
+  document.getElementById('s-active').textContent=activeUsers;
+  document.getElementById('s-codes').textContent=activeCodes;
+
+  const onlineDevs=Object.entries(D.presence).filter(([,p])=>p.online);
+  const ol=document.getElementById('online-list');
+  if(!onlineDevs.length){ol.innerHTML='<p class="empty">Nadie conectado.</p>';return;}
+  ol.innerHTML=`<div class="tw"><table><thead><tr><th>Nombre</th><th>Última actividad</th><th class="col-hide">Device ID</th></tr></thead><tbody>${
+    onlineDevs.map(([did,p])=>{
+      const dev=D.devices[did]||{};
+      return `<tr><td><b>${dev.codeName||'Dueño'}</b></td><td>${fmt(p.lastSeen)}</td><td class="col-hide" style="font-family:monospace;font-size:.71rem;color:var(--text2)">${did}</td></tr>`;
+    }).join('')
+  }</tbody></table></div>`;
+}
+
+/* ── USUARIOS ── */
+function renderUsers(){
+  const active=Object.entries(D.devices).filter(([,d])=>!d.archived).sort((a,b)=>(b[1].lastSeen||0)-(a[1].lastSeen||0));
+  const tb=document.getElementById('utb');
+  if(!active.length){tb.innerHTML='<tr><td colspan="7" class="empty">Sin usuarios activos.</td></tr>';return;}
+  const byName={};
+  for(const[did,d] of active){
+    const name=d.codeName||'Dueño';
+    if(!byName[name]){byName[name]={name,dids:[],lastSeen:0,firstSeen:d.firstSeen||0,sessions:0};}
+    const g=byName[name];
+    g.dids.push(did);
+    if((d.lastSeen||0)>g.lastSeen)g.lastSeen=d.lastSeen||0;
+    if(d.firstSeen&&d.firstSeen<g.firstSeen)g.firstSeen=d.firstSeen;
+    g.sessions+=(d.totalSessions||0);
+  }
+  tb.innerHTML=Object.values(byName).sort((a,b)=>b.lastSeen-a.lastSeen).map(g=>{
+    const anyOnline=g.dids.some(did=>D.presence[did]?.online);
+    const anyIdle=!anyOnline&&g.dids.some(did=>!D.presence[did]?.online&&D.presence[did]?.status==='idle');
+    const st=anyOnline?'<span class="pill g">En línea</span>':anyIdle?'<span class="pill" style="background:#e0702015;color:#e07020;border:1px solid #e0702040">Idle</span>':'<span class="pill gr">Offline</span>';
+    const didsJson=JSON.stringify(g.dids);
+    return `<tr class="clickrow" ondblclick="dblUser(JSON.parse(this.dataset.dids),false)" data-dids='${didsJson}' title="Doble clic para archivar">
+      <td><input type="checkbox" class="usel" data-dids='${didsJson}' onchange="updateBulk()"></td>
+      <td><b>${g.name}</b>${g.dids.length>1?` <small style="color:var(--text2);font-weight:400">(${g.dids.length} disp)</small>`:''}</td>
+      <td>${fmt(g.lastSeen)}</td>
+      <td class="col-hide-ses">${g.sessions||1}</td>
+      <td class="col-hide">${fmt(g.firstSeen)}</td>
+      <td>${st}</td>
+      <td class="col-hide" style="font-family:monospace;font-size:.71rem;color:var(--text3)">${g.dids.join(', ')}</td>
+    </tr>`;
+  }).join('');
+  syncSelAll('sel-all','.usel');
+}
+
+/* ── ARCHIVADOS ── */
+function renderArchived(){
+  const archived=Object.entries(D.devices).filter(([,d])=>d.archived).sort((a,b)=>(b[1].lastSeen||0)-(a[1].lastSeen||0));
+  const bdg=document.getElementById('arch-bdg');
+  if(bdg)bdg.textContent=archived.length||'';
+  const tb=document.getElementById('archtb');
+  if(!archived.length){tb.innerHTML='<tr><td colspan="6" class="empty">Sin usuarios archivados.</td></tr>';return;}
+  tb.innerHTML=archived.map(([did,d])=>`<tr class="clickrow" ondblclick="dblUser(['${did}'],true)" title="Doble clic para opciones">
+    <td><input type="checkbox" class="asel" data-did="${did}" onchange="updateBulk()"></td>
+    <td><b>${d.codeName||'?'}</b></td>
+    <td>${fmt(d.lastSeen)}</td>
+    <td class="col-hide-ses">${d.totalSessions||1}</td>
+    <td class="col-hide">${fmt(d.firstSeen)}</td>
+    <td class="col-hide" style="font-family:monospace;font-size:.71rem;color:var(--text3)">${did}</td>
+  </tr>`).join('');
+  syncSelAll('arch-sel-all','.asel');
+}
+
+/* ── CÓDIGOS ── */
+function renderCodes(){
+  const now=new Date();
+  const rows=Object.entries(D.codes).sort((a,b)=>a[1].name?.localeCompare(b[1].name)||0);
+  const tb=document.getElementById('ctb');
+  if(!rows.length){tb.innerHTML='<tr><td colspan="7" class="empty">Sin códigos. Crea uno arriba.</td></tr>';return;}
+  tb.innerHTML=rows.map(([hash,c])=>{
+    const exp=new Date(c.expires);
+    const expired=exp<now;
+    const daysLeft=Math.ceil((exp-now)/(1000*60*60*24));
+    const st=expired?'<span class="pill r">Vencido</span>':daysLeft<=7?`<span class="pill y">Vence en ${daysLeft}d</span>`:'<span class="pill g">Activo</span>';
+    const devReg=Object.keys(D.codeDevices[hash]||{}).length;
+    const maxD=c.maxDevices||1;
+    return `<tr>
+      <td><b>${c.name||'—'}</b></td>
+      <td class="col-hide-cod" style="font-family:monospace;color:var(--text2)">${c.plainCode||'••••••'}</td>
+      <td>${c.expires||'—'}</td>
+      <td>${devReg}/${maxD}</td>
+      <td class="col-hide">${maxD}</td>
+      <td>${st}</td>
+      <td><div class="gap">
+        <button class="btn btn-s" onclick="openEdit('${hash}')">✏ <span class="btn-txt">Editar</span></button>
+        <button class="btn btn-d" onclick="delCode('${hash}','${c.name}')">🗑</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── ESTADÍSTICAS ── */
+function renderStats(){
+  const tb=document.getElementById('stb');
+  if(!tb)return;
+  const allDevs=Object.entries(D.devices);
+  const active=allDevs.filter(([,d])=>!d.archived);
+  const stTotal=document.getElementById('st-total');
+  const stArch=document.getElementById('st-archived');
+  if(stTotal)stTotal.textContent=allDevs.length;
+  if(stArch)stArch.textContent=allDevs.filter(([,d])=>d.archived).length;
+  if(!active.length){tb.innerHTML='<tr><td colspan="13" class="empty">Sin datos.</td></tr>';return;}
+
+  // Group by name: one row per person even if they have multiple devices
+  const byName={};
+  for(const[did,d] of active){
+    const name=d.codeName||'Dueño';
+    const _us=D.userStats[did]||{};
+    if(!byName[name]){
+      byName[name]={name,lastSeen:0,clicks:0,sessions:0,totalTime:0,longest:0,quiz:0,domine:0,meFalta:0,micro:0,microOtraVez:0,microMin6:0,microMin10:0,microDia1:0,microBien:0,microDificil:0,idleTime:0,estudioInt:0};
+    }
+    const g=byName[name];
+    if((d.lastSeen||0)>g.lastSeen)g.lastSeen=d.lastSeen||0;
+    g.sessions+=(d.totalSessions||0);
+    g.domine+=(_us.domine||0);
+    g.meFalta+=(_us.meFalta||0);
+    g.micro+=(D.microStats[did]?.totalReviews||0);
+    g.microOtraVez+=(_us.micro_otraVez||0);
+    g.microMin6+=(_us.micro_min6||0);
+    g.microMin10+=(_us.micro_min10||0);
+    g.microDia1+=(_us.micro_dia1||0);
+    g.microBien+=(_us.micro_bien||0);
+    g.microDificil+=(_us.micro_dificil||0);
+    g.idleTime+=(_us.idle_s||0);
+    g.estudioInt+=(_us.estudioInt||0);
+  }
+  const didToName={};
+  for(const[did,d] of active)didToName[did]=d.codeName||'Dueño';
+  for(const[,s] of Object.entries(D.sessions)){
+    const did=s.deviceId;
+    const name=didToName[did];
+    if(!name||!byName[name])continue;
+    const g=byName[name];
+    const sum=s.summary||{};
+    const live=s.live||{};
+    g.clicks+=(sum.totalClicks||live.totalClicks||s.totalClicks||0);
+    const dur=sum.durationSeconds||live.durationSeconds||0;
+    g.totalTime+=dur;
+    if(dur>g.longest)g.longest=dur;
+    g.quiz+=(sum.quizStarts||live.quizStarts||s.quizStarts||0);
+  }
+  tb.innerHTML=Object.values(byName).sort((a,b)=>(b.clicks||0)-(a.clicks||0)).map(st=>`<tr>
+    <td><b>${st.name}</b></td>
+    <td data-label="Clics">${st.clicks||'—'}</td>
+    <td data-label="Sesiones">${st.sessions||'—'}</td>
+    <td data-label="Tiempo">${fmtTime(st.totalTime)}</td>
+    <td class="col-hide" data-label="Idle total">${fmtTime(st.idleTime)}</td>
+    <td class="col-hide" data-label="Más larga">${fmtTime(st.longest)}</td>
+    <td data-label="Último acceso">${fmt(st.lastSeen)}</td>
+    <td data-label="Interacciones en modo estudio">${st.estudioInt||'—'}</td>
+    <td class="col-hide" data-label="Quiz">${st.quiz||'—'}</td>
+    <td data-label="Dominé">${st.domine||'—'}</td>
+    <td data-label="Me falta">${st.meFalta||'—'}</td>
+    <td data-label="🔬 Micro">${st.micro ? `${st.micro} <small style="color:var(--text2)">(6m${st.microMin6}·10m${st.microMin10}·1d${st.microDia1})</small>` : '—'}</td>
+    <td class="col-hide" data-label="↺ Otra vez">${st.microOtraVez||'—'}</td>
+  </tr>`).join('');
+}
+
+/* ── ALERTAS ── */
+function renderAlerts(){
+  const rows=Object.entries(D.alerts).sort((a,b)=>(b[1].timestamp||0)-(a[1].timestamp||0));
+  const unread=rows.filter(([,a])=>!a.read).length;
+  document.getElementById('ab').textContent=unread||'';
+  document.getElementById('s-alerts').textContent=unread;
+  const al=document.getElementById('alist');
+  if(!rows.length){al.innerHTML='<p class="empty">Sin alertas.</p>';return;}
+  al.innerHTML=rows.map(([id,a])=>`
+    <div class="ai ${a.read?'':'unread'}" onclick="markRead('${id}')">
+      <div>
+        <div class="ai-title">⚠ Intento no autorizado — ${a.codeName||'?'}</div>
+        <div class="ai-det">Device: ${a.attemptDeviceId||'?'} · Registrados: ${a.registeredCount||'?'}/${a.maxDevices||1}</div>
+      </div>
+      <div class="ai-time">${fmt(a.timestamp)}</div>
+    </div>`).join('');
+}
+
+/* ── TABS ── */
+window.tab=function(btn,id){
+  currentTab=id;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById(id).classList.add('on');
+  clearSelSilent();
+};
+
+/* ── MODALS ── */
+window.closeM=function(id){document.getElementById(id).classList.remove('op');};
+
+/* ── CREAR CÓDIGO ── */
+window.openCreate=function(){
+  document.getElementById('cn').value='';
+  document.getElementById('cc').value='';
+  const d=new Date();d.setMonth(d.getMonth()+1);
+  document.getElementById('ce').value=d.toISOString().split('T')[0];
+  document.getElementById('cm').value=1;
+  document.getElementById('cerr').textContent='';
+  document.getElementById('m-create').classList.add('op');
+};
+window.createCode=async function(){
+  const name=document.getElementById('cn').value.trim();
+  const code=document.getElementById('cc').value.trim().toUpperCase();
+  const exp=document.getElementById('ce').value;
+  const maxD=parseInt(document.getElementById('cm').value)||1;
+  const err=document.getElementById('cerr');
+  if(!name){err.textContent='Ingresa el nombre.';return;}
+  if(!code){err.textContent='Ingresa el código.';return;}
+  if(!exp){err.textContent='Selecciona fecha de vencimiento.';return;}
+  try{
+    const hash=await sha256(code);
+    await set(ref(db,`codes/${hash}`),{name,plainCode:code,expires:exp,maxDevices:maxD,createdAt:serverTimestamp()});
+    window.closeM('m-create');
+  }catch(e){err.textContent='Error al guardar: '+e.message;}
+};
+
+/* ── EDITAR CÓDIGO ── */
+let editHash=null;
+window.openEdit=async function(hash){
+  editHash=hash;
+  const c=D.codes[hash]||{};
+  document.getElementById('en').textContent=c.name||'';
+  document.getElementById('ename').value=c.name||'';
+  document.getElementById('eexp').value=c.expires||'';
+  document.getElementById('emax').value=c.maxDevices||1;
+  document.getElementById('eerr').textContent='';
+  const devs=D.codeDevices[hash]||{};
+  const dl=document.getElementById('edevs');
+  if(!Object.keys(devs).length){
+    dl.innerHTML='<p style="color:var(--text3);font-size:.78rem;padding:6px">Sin dispositivos registrados.</p>';
+  } else {
+    const sorted=Object.entries(devs).sort((a,b)=>(b[1].registeredAt||0)-(a[1].registeredAt||0));
+    dl.innerHTML=sorted.map(([did,dv],i)=>`
+      <div class="dev-row">
+        <div style="min-width:0">
+          <span class="dev-id">${did}</span>
+          <div style="font-size:.68rem;color:var(--text3);margin-top:2px">Registrado: ${fmt(dv.registeredAt)}${i===0?' <span style="color:#f59e0b;font-weight:600">&#9650; más nuevo</span>':''}</div>
+        </div>
+        <button class="btn btn-d" style="font-size:.71rem;padding:3px 9px;min-height:28px;flex-shrink:0" onclick="removeDevice('${hash}','${did}')">Liberar</button>
+      </div>`).join('');
+  }
+  document.getElementById('m-edit').classList.add('op');
+};
+window.saveEdit=async function(){
+  if(!editHash)return;
+  const name=document.getElementById('ename').value.trim();
+  const exp=document.getElementById('eexp').value;
+  const maxD=parseInt(document.getElementById('emax').value)||1;
+  const err=document.getElementById('eerr');
+  if(!name){err.textContent='Ingresa el nombre.';return;}
+  if(!exp){err.textContent='Selecciona fecha.';return;}
+  try{
+    await update(ref(db,`codes/${editHash}`),{name,expires:exp,maxDevices:maxD});
+    window.closeM('m-edit');
+  }catch(e){err.textContent='Error al guardar: '+e.message;}
+};
+window.removeDevice=async function(hash,did){
+  if(!confirm('¿Liberar este dispositivo? El usuario deberá registrarse de nuevo.'))return;
+  await remove(ref(db,`codeDevices/${hash}/${did}`));
+  window.openEdit(hash);
+};
+
+/* ── ELIMINAR CÓDIGO ── */
+window.delCode=async function(hash,name){
+  if(!confirm(`¿Eliminar el código de ${name}?\nSe liberarán todos sus dispositivos.`))return;
+  try{
+    await remove(ref(db,`codes/${hash}`));
+    await remove(ref(db,`codeDevices/${hash}`));
+  }catch(e){alert('Error al eliminar: '+e.message);}
+};
+
+/* ── ACCIÓN USUARIO (doble clic) ── */
+window.dblUser=function(dids,isArchived){
+  if(!Array.isArray(dids))dids=[dids];
+  const dev=D.devices[dids[0]]||{};
+  document.getElementById('act-name').textContent=dev.codeName||'Usuario';
+  const btn=document.getElementById('act-btn');
+  const btn2=document.getElementById('act-btn2');
+  if(!isArchived){
+    document.getElementById('act-desc').textContent=dids.length>1?`Se archivarán los ${dids.length} dispositivos de este usuario.`:'El usuario se moverá a Archivados. Puede seguir usando la app con normalidad.';
+    btn2.style.display='none';
+    btn.textContent='Archivar';btn.className='btn btn-w';
+    btn.onclick=async()=>{await Promise.all(dids.map(did=>set(ref(db,`devices/${did}/archived`),true)));window.closeM('m-action');};
+  } else {
+    document.getElementById('act-desc').textContent='Elige qué hacer con este usuario archivado.';
+    btn2.style.display='';
+    btn2.textContent='Restaurar';
+    btn2.onclick=async()=>{await set(ref(db,`devices/${dids[0]}/archived`),false);window.closeM('m-action');};
+    btn.textContent='Eliminar';btn.className='btn btn-d';
+    btn.onclick=async()=>{
+      if(!confirm('¿Eliminar permanentemente del historial?'))return;
+      await remove(ref(db,`devices/${dids[0]}`));window.closeM('m-action');
+    };
+  }
+  document.getElementById('m-action').classList.add('op');
+};
+
+/* ── BULK SELECT ── */
+function syncSelAll(saId,cls){
+  const total=document.querySelectorAll(cls).length;
+  const checked=document.querySelectorAll(`${cls}:checked`).length;
+  const sa=document.getElementById(saId);
+  if(sa)sa.checked=total>0&&checked===total;
+}
+function updateBulk(){
+  const isArch=currentTab==='archived';
+  const cls=isArch?'.asel':'.usel';
+  const checked=document.querySelectorAll(`${cls}:checked`);
+  const bar=document.getElementById('bulk-bar');
+  const mainBtn=document.getElementById('bulk-main');
+  document.getElementById('bulk-n').textContent=checked.length;
+  if(checked.length>0){
+    bar.classList.add('on');
+    if(isArch){mainBtn.textContent='Restaurar';mainBtn.className='btn btn-g';}
+    else{mainBtn.textContent='Archivar';mainBtn.className='btn btn-w';}
+  } else {
+    bar.classList.remove('on');
+  }
+  syncSelAll(isArch?'arch-sel-all':'sel-all',cls);
+}
+window.selAllUsers=function(el){
+  document.querySelectorAll('.usel').forEach(cb=>{cb.checked=el.checked;});
+  updateBulk();
+};
+window.selAllArchived=function(el){
+  document.querySelectorAll('.asel').forEach(cb=>{cb.checked=el.checked;});
+  updateBulk();
+};
+function clearSelSilent(){
+  document.querySelectorAll('.usel,.asel').forEach(cb=>{cb.checked=false;});
+  ['sel-all','arch-sel-all'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=false;});
+  document.getElementById('bulk-bar').classList.remove('on');
+}
+window.clearSelection=clearSelSilent;
+
+window.bulkMain=function(){
+  if(currentTab==='archived'){
+    const checked=[...document.querySelectorAll('.asel:checked')];
+    if(!checked.length)return;
+    if(!confirm(`¿Restaurar ${checked.length} usuario(s)?`))return;
+    Promise.all(checked.map(cb=>set(ref(db,`devices/${cb.dataset.did}/archived`),false))).then(clearSelSilent);
+  } else {
+    const checked=[...document.querySelectorAll('.usel:checked')];
+    if(!checked.length)return;
+    if(!confirm(`¿Archivar ${checked.length} usuario(s)?`))return;
+    const dids=checked.flatMap(cb=>JSON.parse(cb.dataset.dids||'[]'));
+    Promise.all(dids.map(did=>set(ref(db,`devices/${did}/archived`),true))).then(clearSelSilent);
+  }
+};
+window.bulkDelete=function(){
+  const cls=currentTab==='archived'?'.asel':'.usel';
+  const checked=[...document.querySelectorAll(`${cls}:checked`)];
+  if(!checked.length)return;
+  if(!confirm(`¿Eliminar permanentemente ${checked.length} usuario(s) del historial?`))return;
+  const dids=currentTab==='archived'
+    ?checked.map(cb=>cb.dataset.did)
+    :checked.flatMap(cb=>JSON.parse(cb.dataset.dids||'[]'));
+  Promise.all(dids.map(did=>remove(ref(db,`devices/${did}`)))).then(clearSelSilent);
+};
+
+/* ── CERRAR SESIÓN ── */
+window.logout=function(){clearAuth();location.reload();};
+
+/* ── FORZAR RECARGA ── */
+window.forceReloadAll = async function() {
+  const btn = document.getElementById('btn-force-reload');
+  const msg = document.getElementById('force-reload-msg');
+  btn.disabled = true;
+  btn.textContent = 'Actualizando...';
+  try {
+    const snap = await get(ref(db, 'version/v'));
+    const cur = snap.val() || '1.0';
+    const parts = String(cur).split('.');
+    const next = parts[0] + '.' + (parseInt(parts[1] || '0') + 1);
+    await set(ref(db, 'version/v'), next);
+    msg.textContent = `✓ Enviado (v${next}) — todos se recargarán en segundos`;
+    msg.style.color = '#16a34a';
+  } catch(e) {
+    msg.textContent = 'Error: ' + e.message;
+    msg.style.color = '#dc2626';
+  }
+  btn.disabled = false;
+  btn.textContent = '↻ Actualizar a todos';
+  setTimeout(() => { msg.textContent = ''; }, 5000);
+};
+
+/* ── ALERTAS ── */
+window.markRead=async function(id){await set(ref(db,`alerts/${id}/read`),true);};
+window.markAll=async function(){
+  await Promise.all(Object.keys(D.alerts).map(id=>set(ref(db,`alerts/${id}/read`),true)));
+};
+</script>
+</body>
+</html>
