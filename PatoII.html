@@ -665,7 +665,7 @@ const load=id=>JSON.parse(localStorage.getItem(key(id))||'{"status":"none"}');
 const save=(id,data)=>{const d=load(id);Object.assign(d,data);localStorage.setItem(key(id),JSON.stringify(d));window.scheduleSyncSave?.();};
 
 // IMAGES
-const GITHUB_IMG_BASE='https://salt-cloudy.github.io/Pato-II/';
+const GITHUB_IMG_BASE='https://raw.githubusercontent.com/Salt-cloudy/Pato-II/main/';
 function resolveImgUrl(p){
   if(!p||/^(data:|https?:)/.test(p))return p;
   return GITHUB_IMG_BASE+encodeURI(p);
