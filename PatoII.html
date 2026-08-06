@@ -311,7 +311,7 @@ html.light .disease-item.active{background:#3b7dd812}
   </select>
   <button class="mode-btn active" id="btn-estudio" onclick="setMode('estudio')">📖 Estudio</button>
   <button class="mode-btn" id="btn-quiz" onclick="setMode('quiz')">🧠 Quiz</button>
-  <button class="mode-btn" id="btn-micro" onclick="setMode('microscopio')">🔬 Microscopio</button>
+  <button class="mode-btn" id="btn-micro" onclick="setMode('microscopio')" style="display:none">🔬 Microscopio</button>
   <div class="progress-mini">Dominadas: <span id="prog-pct">0%</span></div>
   <div id="settings-wrap">
     <button class="settings-btn" onclick="toggleSettings()">⚙ Opciones</button>
@@ -562,17 +562,16 @@ const ACCESS_CFG = {
 function checkAccess(){
   // Archivo local = dueño, sin restricción
   if(location.protocol==='file:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'){hideLock();return;}
-  // GitHub Pages = verificar contra ACCESS_CFG (no contra localStorage)
   const raw=localStorage.getItem('pato2_access');
   if(!raw){showLock();return;}
   try{
     const a=JSON.parse(raw);
     if(a.permanent){hideLock();return;}
-    if(a.hash){
-      // La fecha se lee de ACCESS_CFG, nunca de localStorage
-      const match=ACCESS_CFG.codes.find(x=>x.hash===a.hash);
-      if(match&&new Date(match.expires)>new Date()){hideLock();return;}
-    }
+    // La fecha de vencimiento se guardó en localStorage al validar el código
+    // (contra ACCESS_CFG o contra Firebase, según el origen del código).
+    // La validación real/definitiva contra Firebase ocurre después, de forma
+    // async, en el script del módulo (checkDeviceLock + ensureContentLoaded).
+    if(a.hash&&a.expires&&new Date(a.expires)>new Date()){hideLock();return;}
   }catch(e){}
   localStorage.removeItem('pato2_access');
   showLock();
@@ -666,9 +665,10 @@ const save=(id,data)=>{const d=load(id);Object.assign(d,data);localStorage.setIt
 
 // IMAGES
 const GITHUB_IMG_BASE='https://raw.githubusercontent.com/Salt-cloudy/Pato-II/main/';
+const IMG_VERSION='20260806a';
 function resolveImgUrl(p){
   if(!p||/^(data:|https?:)/.test(p))return p;
-  return GITHUB_IMG_BASE+encodeURI(p);
+  return GITHUB_IMG_BASE+encodeURI(p)+'?v='+IMG_VERSION;
 }
 function getImgs(id){
   const imgs=imagesMap[id];
@@ -797,12 +797,23 @@ document.addEventListener('click',e=>{
 });
 
 // SIDEBAR
+const SYSTEM_ORDER=['Femenino','Urinario','Masculino'];
+const ORGAN_ORDER=['Vulva','Vagina','Cérvix','Endometrio','Miometrio','Trompa Uterina','Ovario','Mama','Vías Urinarias','Pene','Testículo','Próstata'];
+function byCustomOrder(order){
+  return (a,b)=>{
+    const ia=order.indexOf(a), ib=order.indexOf(b);
+    if(ia===-1&&ib===-1)return a.localeCompare(b);
+    if(ia===-1)return 1;
+    if(ib===-1)return -1;
+    return ia-ib;
+  };
+}
 function buildSidebar(q=''){
   const sf=document.getElementById('filter-system').value;
   const of=document.getElementById('filter-organ').value;
   const dl=document.getElementById('disease-list');
   dl.innerHTML='';
-  const allSystems=[...new Set(diseases.flatMap(d=>d.system.split(' / ')))].sort();
+  const allSystems=[...new Set(diseases.flatMap(d=>d.system.split(' / ')))].sort(byCustomOrder(SYSTEM_ORDER));
   allSystems.forEach(sys=>{
     const items=diseases.filter(d=>
       (!sf||d.system.split(' / ').includes(sf))&&
@@ -826,13 +837,13 @@ function buildSidebar(q=''){
 }
 function buildSystemFilter(){
   const sel=document.getElementById('filter-system');
-  [...new Set(diseases.flatMap(d=>d.system.split(' / ')))].sort().forEach(s=>{
+  [...new Set(diseases.flatMap(d=>d.system.split(' / ')))].sort(byCustomOrder(SYSTEM_ORDER)).forEach(s=>{
     const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);
   });
 }
 function buildOrganFilter(){
   const sel=document.getElementById('filter-organ');
-  [...new Set(diseases.map(d=>d.organ))].sort().forEach(og=>{
+  [...new Set(diseases.map(d=>d.organ))].sort(byCustomOrder(ORGAN_ORDER)).forEach(og=>{
     const o=document.createElement('option');o.value=og;o.textContent=og;sel.appendChild(o);
   });
 }
@@ -1640,6 +1651,62 @@ async function ensureContentLoaded(codeHash) {
     return false;
   }
 }
+
+const RESUME_KEY = 'pato2_resume';
+function saveResumeState() {
+  try {
+    const state = {};
+    if (mode === 'quiz' && qQueue.length && document.getElementById('quiz-question').style.display !== 'none') {
+      state.quiz = { ids: qQueue.map(d => d.id), idx: qIdx, ok: qOk, fail: qFail };
+    } else if (currentDiseaseId && document.getElementById('disease-card').style.display !== 'none') {
+      state.disease = { id: currentDiseaseId, imgIdx: (histoCycle.id === currentDiseaseId) ? histoCycle.idx : 0 };
+    }
+    if (Object.keys(state).length) localStorage.setItem(RESUME_KEY, JSON.stringify(state));
+  } catch (e) {}
+}
+
+function restoreResumeState() {
+  let raw;
+  try { raw = localStorage.getItem(RESUME_KEY); } catch (e) { return; }
+  if (!raw) return;
+  try { localStorage.removeItem(RESUME_KEY); } catch (e) {}
+  let state;
+  try { state = JSON.parse(raw); } catch (e) { return; }
+  try {
+    if (state.quiz) {
+      const restored = (state.quiz.ids || []).map(id => diseases.find(d => d.id === id)).filter(Boolean);
+      if (restored.length) {
+        qQueue = restored;
+        qIdx = Math.min(state.quiz.idx || 0, qQueue.length - 1);
+        qOk = state.quiz.ok || 0;
+        qFail = state.quiz.fail || 0;
+        setMode('quiz');
+        document.getElementById('quiz-config').style.display = 'none';
+        document.getElementById('quiz-results').style.display = 'none';
+        document.getElementById('quiz-question').style.display = 'block';
+        renderQ();
+        return;
+      }
+    }
+    if (state.disease) {
+      const d = diseases.find(x => x.id === state.disease.id);
+      if (d) {
+        setMode('estudio');
+        selectD(d);
+        const imgs = getImgs(d.id);
+        if (imgs.length && typeof state.disease.imgIdx === 'number') {
+          histoCycle.idx = Math.min(state.disease.imgIdx, imgs.length - 1);
+          const el = document.getElementById('histo-main-img');
+          if (el) el.src = imgs[histoCycle.idx];
+          const ct = document.getElementById('histo-img-counter');
+          if (ct) ct.textContent = (histoCycle.idx + 1) + '/' + imgs.length;
+          histoUpdateFavBtn();
+        }
+      }
+    }
+  } catch (e) { console.error('Error restaurando posición:', e); }
+}
+
 window.microPushStats = function(stats) {
   set(ref(db, 'microStats/' + deviceId), {
     totalReviews: stats.totalReviews || 0,
@@ -1698,8 +1765,9 @@ function startTracking() {
   onValue(ref(db, 'version/v'), snap => {
     const v = snap.val();
     if (_initVer === null) { _initVer = v; return; }
-    if (v !== null && v !== _initVer) location.reload();
+    if (v !== null && v !== _initVer) { saveResumeState(); location.reload(); }
   });
+  restoreResumeState();
   // Write live stats every 60s so admin can see data even without session end
   setInterval(() => {
     if (!sessionActive) return;
@@ -1892,7 +1960,7 @@ async function checkDeviceLock(hash) {
   ]);
   const codeData = codeSnap.val() || {};
   const codeName = codeData.name || fbCodeName || 'Desconocido';
-  const maxDevices = codeData.maxDevices || 2;
+  const maxDevices = codeData.maxDevices || 1;
   const registered = devSnap.val() || {};
   // Already registered — add fingerprint retroactively if missing
   if (registered[deviceId]) {
@@ -1900,16 +1968,6 @@ async function checkDeviceLock(hash) {
       set(ref(db, `codeDevices/${hash}/${deviceId}/fingerprint`), fp);
     }
     return true;
-  }
-  // Same physical device, different browser — fingerprint match
-  if (fp) {
-    for (const [existingId, data] of Object.entries(registered)) {
-      if (data.fingerprint && data.fingerprint === fp) {
-        localStorage.setItem('pato2_deviceId', existingId);
-        deviceId = existingId;
-        return true;
-      }
-    }
   }
   // Code doesn't exist in Firebase — reject unless hardcoded
   if (!codeSnap.exists()) {
