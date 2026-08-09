@@ -699,7 +699,7 @@ const save=(id,data)=>{const d=load(id);Object.assign(d,data);localStorage.setIt
 
 // IMAGES
 const GITHUB_IMG_BASE='https://raw.githubusercontent.com/Salt-cloudy/Pato-II/main/';
-const IMG_VERSION='20260806a';
+const IMG_VERSION='20260809a';
 function resolveImgUrl(p){
   if(!p||/^(data:|https?:)/.test(p))return p;
   return GITHUB_IMG_BASE+encodeURI(p)+'?v='+IMG_VERSION;
