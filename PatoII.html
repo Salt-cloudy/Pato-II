@@ -897,13 +897,17 @@ function buildOrganFilter(){
 function filterList(){buildSidebar(document.getElementById('search').value);}
 
 // SIDEBAR TOGGLE
-function toggleSidebar(){
+function setSidebarVisible(show){
   const sb=document.getElementById('sidebar');
   const btn=document.getElementById('sidebar-open-btn');
   const bd=document.getElementById('sb-backdrop');
-  const collapsed=sb.classList.toggle('collapsed');
-  btn.style.display=collapsed?'block':'none';
-  if(bd)bd.classList.toggle('visible',!collapsed&&window.innerWidth<=640);
+  sb.classList.toggle('collapsed',!show);
+  btn.style.display=show?'none':'block';
+  if(bd)bd.classList.toggle('visible',show&&window.innerWidth<=640);
+}
+function toggleSidebar(){
+  const sb=document.getElementById('sidebar');
+  setSidebarVisible(sb.classList.contains('collapsed'));
 }
 
 // SELECT
@@ -1077,6 +1081,7 @@ function setMode(m){
   document.getElementById('btn-estudio').className='mode-btn'+(m==='estudio'?' active':'');
   document.getElementById('btn-quiz').className='mode-btn'+(m==='quiz'?' active':'');
   document.getElementById('btn-micro').className='mode-btn'+(m==='microscopio'?' active':'');
+  setSidebarVisible(m==='estudio');
   if(m==='quiz')buildQuizCfg();
   if(m==='microscopio')microShowHome();
 }
@@ -1191,7 +1196,7 @@ function toggleAllDis(all){
 function startQuiz(){
   let pool=[...diseases];
   if(qCfg.systems.length>0&&qCfg.systems[0]==='weak-only'){
-    pool=pool.filter(d=>load(d.id).status==='weak');
+    pool=pool.filter(d=>load(d.id).quizStatus==='weak');
   } else if(qCfg.systems.length>0){
     pool=pool.filter(d=>qCfg.systems.some(s=>d.system.split(' / ').includes(s)));
     if(qCfg.organs.length>0){
@@ -1236,11 +1241,11 @@ function markQ(st){
   const data=load(d.id);
   if(st==='dominated'){
     const cnt=Math.min((data.domCount||0)+1,10);
-    save(d.id,{status:cnt>=10?'dominated':'seen',domCount:cnt});
+    save(d.id,{quizStatus:cnt>=10?'dominated':'seen',domCount:cnt});
     qOk++;
   } else {
     const cnt=Math.max((data.domCount||0)-3,0);
-    save(d.id,{status:'weak',domCount:cnt});
+    save(d.id,{quizStatus:'weak',domCount:cnt});
     qFail++;
   }
   nextQ();
@@ -2116,7 +2121,7 @@ function _getDiseaseStatuses(){
       if(!id)continue;
       try{
         const d=JSON.parse(localStorage.getItem(k));
-        if(d&&typeof d.status==='string'&&d.status!=='none')result[id]=d;
+        if(d&&((typeof d.status==='string'&&d.status!=='none')||(typeof d.quizStatus==='string'&&d.quizStatus!=='none')||d.domCount))result[id]=d;
       }catch(e){}
     }
   }catch(e){}
