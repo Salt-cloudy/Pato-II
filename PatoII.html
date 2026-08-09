@@ -1563,14 +1563,14 @@ function microShowGallery(title){
   const grid=document.getElementById('micro-gallery-grid');
   grid.innerHTML=cards.map(function(c,i){
     return '<div class="micro-gallery-item" onclick="microGalleryOpen('+i+')">'
-      +'<img src="'+c.src+'" alt="" loading="lazy">'
+      +'<img src="'+resolveImgUrl(c.src)+'" alt="" loading="lazy">'
       +'<div class="micro-gallery-name">'+c.name+'</div>'
       +'</div>';
   }).join('');
 }
 function microGalleryOpen(idx){
   const cards=microCards();
-  const imgs=cards.map(function(c){return c.src;});
+  const imgs=cards.map(function(c){return resolveImgUrl(c.src);});
   const names=cards.map(function(c){return c.name;});
   openLightboxArr(imgs,idx,names);
 }
@@ -1717,7 +1717,7 @@ function microShowNext(){
     microFlipped=false;
 
     const data=cards.find(c=>c.id===microCurrent.id)||{};
-    document.getElementById('micro-img').src=data.src||'';
+    document.getElementById('micro-img').src=data.src?resolveImgUrl(data.src):'';
     document.getElementById('micro-name').textContent=data.name||'';
     document.getElementById('micro-reveal').style.display='none';
 
