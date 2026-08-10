@@ -2090,6 +2090,8 @@ window.setStatus = function(v) {
   const action = v === 'dominated' ? 'domine' : v === 'weak' ? 'me_falta' : v;
   set(ref(db, `sessions/${sessionId}/mastery/${currentDiseaseId}`), { action, time: serverTimestamp() });
   logEvent(analytics, 'status_change', { disease_id: currentDiseaseId, status: action });
+  if (v === 'dominated') incrementUserStat('domine');
+  if (v === 'weak') incrementUserStat('meFalta');
   if (v === 'dominated' || v === 'weak') window.pushUserStats?.();
 };
 
@@ -2098,6 +2100,8 @@ window.markQ = function(v) {
   _origMarkQ(v);
   if (!sessionActive) return;
   logEvent(analytics, 'quiz_mark', { status: v === 'dominated' ? 'domine_quiz' : 'me_falta_quiz' });
+  if (v === 'dominated') incrementUserStat('domine');
+  if (v === 'weak') incrementUserStat('meFalta');
   if (v === 'dominated' || v === 'weak') window.pushUserStats?.();
 };
 
