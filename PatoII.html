@@ -855,6 +855,7 @@ function byCustomOrder(order){
     return ia-ib;
   };
 }
+function norm(s){return s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();}
 function buildSidebar(q=''){
   const sf=document.getElementById('filter-system').value;
   const of=document.getElementById('filter-organ').value;
@@ -866,7 +867,7 @@ function buildSidebar(q=''){
       (!sf||d.system.split(' / ').includes(sf))&&
       (!of||d.organ===of)&&
       d.system.split(' / ').includes(sys)&&
-      (!q||d.name.toLowerCase().includes(q.toLowerCase())||d.organ.toLowerCase().includes(q.toLowerCase()))
+      (!q||norm(d.name).includes(norm(q))||norm(d.organ).includes(norm(q)))
     );
     if(!items.length)return;
     const g=document.createElement('div');
