@@ -133,8 +133,12 @@ html.light .disease-item.active{background:#3b7dd812}
 #lb-close{padding:6px 20px;background:#fff2;border:1px solid #fff4;border-radius:8px;color:#fff;font-size:.9rem;cursor:pointer}
 #lb-close:hover{background:#fff4}
 .histo-info-col{flex:1;min-width:180px}
+.histo-info-wrap{position:relative}
 .histo-info{font-size:.86rem;line-height:1.9;color:var(--text2);white-space:pre-wrap;padding:2px 14px 2px 0;max-height:260px;overflow-y:auto}
-.info-scroll-hint{font-size:.72rem;color:var(--text2);opacity:.55;margin-top:4px;text-align:right;padding-right:14px}
+.histo-scroll-track{display:none;position:absolute;top:0;bottom:0;right:2px;width:5px;background:var(--border);border-radius:3px;pointer-events:none}
+.histo-scroll-thumb{position:absolute;left:0;width:100%;background:var(--accent);border-radius:3px;opacity:.85}
+.info-scroll-hint{font-size:.78rem;font-weight:700;color:var(--accent);opacity:1;margin-top:6px;text-align:right;padding-right:14px;animation:histoHintPulse 1.4s ease-in-out infinite}
+@keyframes histoHintPulse{0%,100%{opacity:1;transform:translateY(0)}50%{opacity:.5;transform:translateY(3px)}}
 .info-tab-btns{display:flex;gap:6px;margin-bottom:8px}
 .info-tab-btn{padding:4px 11px;border-radius:8px;font-size:.75rem;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--card2);color:var(--text2);transition:.15s}
 .info-tab-btn:hover{border-color:var(--accent);color:var(--accent)}
@@ -954,7 +958,7 @@ function renderCard(d){
       <img id="histo-main-img" src="${himgs[0]}" alt="Imagen histológica" style="cursor:zoom-in" onclick="openLightboxArr(getImgs(histoCycle.id),histoCycle.idx)">
       <div class="histo-img-footer">${counterTxt}${navBtns}</div>
     </div>
-    <div class="histo-info-col">${infoTabs}<div class="histo-info" id="info-text"></div><div class="info-scroll-hint" id="info-scroll-hint" style="display:none">Desliza para ver más ▾</div></div>`;
+    <div class="histo-info-col">${infoTabs}<div class="histo-info-wrap"><div class="histo-info" id="info-text" onscroll="updateHistoScrollBar()"></div><div class="histo-scroll-track" id="histo-scroll-track"><div class="histo-scroll-thumb" id="histo-scroll-thumb"></div></div></div><div class="info-scroll-hint" id="info-scroll-hint" style="display:none">▾ Desliza para ver más ▾</div></div>`;
   renderInfoTab();
   histoUpdateFavBtn();
 }
@@ -980,6 +984,24 @@ function renderInfoTab(){
   if(bD)bD.classList.toggle('active',eff==='diff');
   const hint=document.getElementById('info-scroll-hint');
   if(hint)hint.style.display=(el.scrollHeight>el.clientHeight+2)?'block':'none';
+  updateHistoScrollBar();
+}
+
+function updateHistoScrollBar(){
+  const el=document.getElementById('info-text');
+  const track=document.getElementById('histo-scroll-track');
+  const thumb=document.getElementById('histo-scroll-thumb');
+  if(!el||!track||!thumb)return;
+  const overflow=el.scrollHeight>el.clientHeight+2;
+  track.style.display=overflow?'block':'none';
+  if(!overflow)return;
+  const trackH=track.clientHeight;
+  const thumbH=Math.max(20,trackH*(el.clientHeight/el.scrollHeight));
+  const maxTop=trackH-thumbH;
+  const scrollRange=el.scrollHeight-el.clientHeight;
+  const top=scrollRange>0?maxTop*(el.scrollTop/scrollRange):0;
+  thumb.style.height=thumbH+'px';
+  thumb.style.top=top+'px';
 }
 
 function nextHistoImg(){
@@ -1307,6 +1329,29 @@ document.getElementById('lightbox').addEventListener('touchend',function(e){
   var dy=e.changedTouches[0].clientY-_lbTy;
   if(Math.abs(dx)>50&&Math.abs(dx)>Math.abs(dy)){
     if(dx<0)lbNext();else lbPrev();
+    e.preventDefault();
+  }
+});
+
+// Touch swipe navigation for small histo image (estudio mode, no lightbox)
+var _hiTx=0,_hiTy=0;
+document.getElementById('histo-wrap').addEventListener('touchstart',function(e){
+  if(e.touches.length===1){_hiTx=e.touches[0].clientX;_hiTy=e.touches[0].clientY;}
+},{passive:true});
+document.getElementById('histo-wrap').addEventListener('touchmove',function(e){
+  if(e.touches.length!==1)return;
+  var dx=e.touches[0].clientX-_hiTx;
+  var dy=e.touches[0].clientY-_hiTy;
+  if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>10)e.preventDefault();
+},{passive:false});
+document.getElementById('histo-wrap').addEventListener('touchend',function(e){
+  if(!histoCycle.id)return;
+  var imgs=getImgs(histoCycle.id);
+  if(imgs.length<2)return;
+  var dx=e.changedTouches[0].clientX-_hiTx;
+  var dy=e.changedTouches[0].clientY-_hiTy;
+  if(Math.abs(dx)>50&&Math.abs(dx)>Math.abs(dy)){
+    if(dx<0)nextHistoImg();else prevHistoImg();
     e.preventDefault();
   }
 });
