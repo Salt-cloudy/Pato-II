@@ -783,6 +783,7 @@ function closeLightbox(){
 function lbZoom(e){
   e.stopPropagation();
   if(lbDragMoved){lbDragMoved=false;return;}
+  if(window.matchMedia('(pointer:coarse)').matches)return;
   const img=document.getElementById('lb-img');
   lbZoomed=!lbZoomed;
   lbPanX=0;lbPanY=0;
