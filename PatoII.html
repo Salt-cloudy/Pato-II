@@ -2058,6 +2058,7 @@ function startTracking() {
       quizStarts,
       lastUpdate: serverTimestamp()
     });
+    if (typeof window.pushUserStats === 'function') window.pushUserStats();
   }, 60000);
 }
 
