@@ -1873,7 +1873,7 @@ document.addEventListener('keydown',function(e){
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js';
-import { getDatabase, ref, set, get, push, onValue, onDisconnect, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js';
+import { getDatabase, ref, set, get, update, push, onValue, onDisconnect, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js';
 import { getAnalytics, logEvent } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-analytics.js';
 import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
 
@@ -2173,18 +2173,19 @@ window.scheduleSyncSave=scheduleSyncSave;
 // Flush usando fetch keepalive: sobrevive a un reload/cierre inmediato, a diferencia del
 // SDK de RTDB por websocket, que la navegación puede cancelar a mitad de un set() pendiente.
 const RTDB_URL='https://pato-ii-mt-default-rtdb.firebaseio.com';
+// PATCH (no PUT) con paths individuales "diseases/{id}" — un multi-location update
+// que solo toca las enfermedades que ESTE dispositivo conoce, sin pisar lo que otro
+// dispositivo haya guardado para otras enfermedades entre medio (varios dispositivos
+// pueden compartir el mismo codigo/syncKey; un PUT del nodo completo borraba lo ajeno).
 function flushProgressSync(){
   if(_syncTimer){clearTimeout(_syncTimer);_syncTimer=null;}
   if(!syncKey)return;
   try{
-    const body=JSON.stringify({
-      favs:window._qFavs||{},
-      favOnly:window._qFavOnly||false,
-      diseases:_getDiseaseStatuses(),
-      lastSync:{'.sv':'timestamp'}
-    });
+    const statuses=_getDiseaseStatuses();
+    const patch={favs:window._qFavs||{},favOnly:window._qFavOnly||false,lastSync:{'.sv':'timestamp'}};
+    Object.keys(statuses).forEach(id=>{patch['diseases/'+id]=statuses[id];});
     fetch(RTDB_URL+'/progress/'+encodeURIComponent(syncKey)+'.json',{
-      method:'PUT',headers:{'Content-Type':'application/json'},body,keepalive:true
+      method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch),keepalive:true
     }).catch(()=>{});
   }catch(e){}
 }
@@ -2213,12 +2214,10 @@ function _getDiseaseStatuses(){
 async function saveProgressToCloud(){
   if(!syncKey)return;
   try{
-    await set(ref(db,'progress/'+syncKey),{
-      favs:window._qFavs||{},
-      favOnly:window._qFavOnly||false,
-      diseases:_getDiseaseStatuses(),
-      lastSync:serverTimestamp()
-    });
+    const statuses=_getDiseaseStatuses();
+    const patch={favs:window._qFavs||{},favOnly:window._qFavOnly||false,lastSync:serverTimestamp()};
+    Object.keys(statuses).forEach(id=>{patch['diseases/'+id]=statuses[id];});
+    await update(ref(db,'progress/'+syncKey),patch);
   }catch(e){console.warn('Sync save:',e);}
 }
 
