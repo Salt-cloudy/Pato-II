@@ -2139,8 +2139,7 @@ window.startQuiz = function() {
 const _origSetStatus = window.setStatus;
 window.setStatus = function(v) {
   _origSetStatus(v);
-  if (_syncTimer) { clearTimeout(_syncTimer); _syncTimer = null; }
-  saveProgressToCloud();
+  flushProgressSync();
   if (!sessionActive || !currentDiseaseId) return;
   const action = v === 'dominated' ? 'domine' : v === 'weak' ? 'me_falta' : v;
   set(ref(db, `sessions/${sessionId}/mastery/${currentDiseaseId}`), { action, time: serverTimestamp() });
@@ -2170,6 +2169,29 @@ function scheduleSyncSave(){
   _syncTimer=setTimeout(saveProgressToCloud,3000);
 }
 window.scheduleSyncSave=scheduleSyncSave;
+
+// Flush usando fetch keepalive: sobrevive a un reload/cierre inmediato, a diferencia del
+// SDK de RTDB por websocket, que la navegación puede cancelar a mitad de un set() pendiente.
+const RTDB_URL='https://pato-ii-mt-default-rtdb.firebaseio.com';
+function flushProgressSync(){
+  if(_syncTimer){clearTimeout(_syncTimer);_syncTimer=null;}
+  if(!syncKey)return;
+  try{
+    const body=JSON.stringify({
+      favs:window._qFavs||{},
+      favOnly:window._qFavOnly||false,
+      diseases:_getDiseaseStatuses(),
+      lastSync:{'.sv':'timestamp'}
+    });
+    fetch(RTDB_URL+'/progress/'+encodeURIComponent(syncKey)+'.json',{
+      method:'PUT',headers:{'Content-Type':'application/json'},body,keepalive:true
+    }).catch(()=>{});
+  }catch(e){}
+}
+window.flushProgressSync=flushProgressSync;
+window.addEventListener('pagehide',flushProgressSync);
+window.addEventListener('beforeunload',flushProgressSync);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)flushProgressSync();});
 
 function _getDiseaseStatuses(){
   const result={};
