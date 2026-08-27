@@ -2139,6 +2139,8 @@ window.startQuiz = function() {
 const _origSetStatus = window.setStatus;
 window.setStatus = function(v) {
   _origSetStatus(v);
+  if (_syncTimer) { clearTimeout(_syncTimer); _syncTimer = null; }
+  saveProgressToCloud();
   if (!sessionActive || !currentDiseaseId) return;
   const action = v === 'dominated' ? 'domine' : v === 'weak' ? 'me_falta' : v;
   set(ref(db, `sessions/${sessionId}/mastery/${currentDiseaseId}`), { action, time: serverTimestamp() });
