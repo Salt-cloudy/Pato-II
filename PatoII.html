@@ -3,7 +3,39 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Pato II MT</title>
+<script>
+// GitHub Pages sirve este HTML con Cache-Control: max-age=600 (no lo podemos cambiar,
+// GH Pages no soporta headers custom). Eso significa que un "cerrar y volver a abrir"
+// dentro de esos 10 minutos puede mostrar una copia vieja en caché, con bugs ya
+// corregidos en el servidor. Este chequeo, apenas carga el <head>, compara la versión
+// embebida contra la real en RTDB (fetch con cache:'no-store', nunca cacheado) y si
+// difieren fuerza una recarga con un query param nuevo (?_v=...), que la caché del
+// navegador nunca vio, garantizando HTML/JS realmente fresco.
+(function(){
+  try{
+    var BUILD_ID='1.58';
+    if(sessionStorage.getItem('pato2_cachebust_done'))return;
+    var ctrl=(typeof AbortController!=='undefined')?new AbortController():null;
+    var t=ctrl?setTimeout(function(){ctrl.abort();},3000):null;
+    fetch('https://pato-ii-mt-default-rtdb.firebaseio.com/version/v.json',{cache:'no-store',signal:ctrl?ctrl.signal:undefined})
+      .then(function(r){return r.json();})
+      .then(function(v){
+        if(t)clearTimeout(t);
+        if(v&&v!==BUILD_ID){
+          sessionStorage.setItem('pato2_cachebust_done','1');
+          var url=new URL(location.href);
+          url.searchParams.set('_v',String(v).replace(/[^a-zA-Z0-9._-]/g,''));
+          location.replace(url.toString());
+        }
+      })
+      .catch(function(){if(t)clearTimeout(t);});
+  }catch(e){}
+})();
+</script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
