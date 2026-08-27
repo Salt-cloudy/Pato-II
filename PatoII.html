@@ -656,14 +656,14 @@ async function tryCode(){
   if(!val)return;
   const hashed=await sha256(val);
   if(hashed===ACCESS_CFG.ownerHash){
-    _ok();
     localStorage.setItem('pato2_access',JSON.stringify({permanent:true}));
+    _ok();
     hideLock();return;
   }
   const match=ACCESS_CFG.codes.find(x=>x.hash===hashed);
   if(match&&new Date(match.expires)>new Date()){
-    _ok();
     localStorage.setItem('pato2_access',JSON.stringify({hash:hashed,expires:match.expires}));
+    _ok();
     hideLock();return;
   }
   if(match){errEl.textContent='Este código ya venció. Pide uno nuevo.';return;}
