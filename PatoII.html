@@ -2253,6 +2253,17 @@ function initSync(key){
   loadProgressFromCloud(key);
 }
 
+// Fija syncKey y espera a que el progreso de la nube ya esté en localStorage
+// ANTES de que ensureContentLoaded() construya el sidebar y lo haga clickeable.
+// Sin esto, un click de status justo al abrir puede llegar antes de que syncKey
+// exista (el push se pierde silenciosamente) o un pull tardío puede pisar un
+// click recién hecho — eso es lo que causaba que el estado se revirtiera.
+async function presyncBeforeLoad(key){
+  if(!key||syncKey===key)return;
+  syncKey=key;
+  await loadProgressFromCloud(key);
+}
+
 function getFingerprint() {
   try {
     return [screen.width, screen.height, screen.colorDepth||24,
@@ -2300,10 +2311,10 @@ window.hideLock = async function() {
   const raw = localStorage.getItem('pato2_access');
   if (!raw) { _origHideLock(); return; }
   let access; try { access = JSON.parse(raw); } catch(e) { _origHideLock(); return; }
-  if (access.permanent) { await ensureContentLoaded(ACCESS_CFG.ownerHash); _origHideLock(); return; }
+  if (access.permanent) { await presyncBeforeLoad('owner'); await ensureContentLoaded(ACCESS_CFG.ownerHash); _origHideLock(); return; }
   if (!access.hash) { _origHideLock(); return; }
   const allowed = await checkDeviceLock(access.hash);
-  if (allowed) { await ensureContentLoaded(access.hash); _origHideLock(); }
+  if (allowed) { await presyncBeforeLoad(access.hash); await ensureContentLoaded(access.hash); _origHideLock(); }
   else { localStorage.removeItem('pato2_access'); const e = document.getElementById('lock-error'); if (e) e.textContent = 'Este código ya está registrado en otro dispositivo.'; }
 };
 
@@ -2323,7 +2334,7 @@ window.tryCode = async function() {
         localStorage.setItem('pato2_access', JSON.stringify({ hash: hashed, expires: cd.expires }));
         fbCodeName = cd.name;
         const allowed = await checkDeviceLock(hashed);
-        if (allowed) { await ensureContentLoaded(hashed); _origHideLock(); window._ok(); }
+        if (allowed) { await presyncBeforeLoad(hashed); await ensureContentLoaded(hashed); _origHideLock(); window._ok(); }
         else { localStorage.removeItem('pato2_access'); const e = document.getElementById('lock-error'); if (e) e.textContent = 'Este código ya está registrado en otro dispositivo.'; }
         return;
       }
@@ -2336,10 +2347,10 @@ const _raw = localStorage.getItem('pato2_access');
 if (_raw) {
   try {
     const _a = JSON.parse(_raw);
-    if (_a.permanent) { ensureContentLoaded(ACCESS_CFG.ownerHash).then(() => startTracking()); }
+    if (_a.permanent) { presyncBeforeLoad('owner').then(() => ensureContentLoaded(ACCESS_CFG.ownerHash)).then(() => startTracking()); }
     else if (_a.hash) {
       checkDeviceLock(_a.hash).then(ok => {
-        if (ok) { ensureContentLoaded(_a.hash).then(() => startTracking()); }
+        if (ok) { presyncBeforeLoad(_a.hash).then(() => ensureContentLoaded(_a.hash)).then(() => startTracking()); }
         else { localStorage.removeItem('pato2_access'); window.showLock && window.showLock(); const e = document.getElementById('lock-error'); if (e) e.textContent = 'Este código ya está registrado en otro dispositivo.'; }
       });
     }
