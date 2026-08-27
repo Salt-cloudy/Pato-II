@@ -862,6 +862,20 @@ document.addEventListener('keydown',function(e){
   if(e.key==='ArrowRight'){e.preventDefault();nextHistoImg();}
   else if(e.key==='ArrowLeft'){e.preventDefault();prevHistoImg();}
 });
+document.addEventListener('keydown',function(e){
+  if(e.code!=='Space')return;
+  const lb=document.getElementById('lightbox');
+  if(lb&&lb.classList.contains('open'))return;
+  if(mode!=='estudio'||!cur)return;
+  const tag=(document.activeElement&&document.activeElement.tagName)||'';
+  if(tag==='INPUT'||tag==='TEXTAREA')return;
+  e.preventDefault();
+  const items=[...document.querySelectorAll('#disease-list .disease-item')];
+  const idx=items.findIndex(el=>el.classList.contains('active'));
+  if(idx===-1)return;
+  const next=e.shiftKey?items[idx-1]:items[idx+1];
+  if(next)next.click();
+});
 function lbBgClick(e){if(e.target===document.getElementById('lightbox'))closeLightbox();}
 // THEME
 function toggleSettings(){
@@ -2175,6 +2189,12 @@ const _origSetStatus = window.setStatus;
 window.setStatus = function(v) {
   _origSetStatus(v);
   flushProgressSync();
+  // Segunda vía de guardado, por SDK/websocket en vez de fetch: el fetch con
+  // keepalive de flushProgressSync se parece a un beacon de tracking y algunos
+  // bloqueadores/extensiones lo descartan en silencio (confirmado via debugLog:
+  // el flush se ejecutaba pero nunca llegaba a la base de datos). update() usa
+  // la misma conexion websocket que ya usan presencia/sesiones, que si funciona.
+  saveProgressToCloud().catch(()=>{});
   if (!sessionActive || !currentDiseaseId) return;
   const action = v === 'dominated' ? 'domine' : v === 'weak' ? 'me_falta' : v;
   set(ref(db, `sessions/${sessionId}/mastery/${currentDiseaseId}`), { action, time: serverTimestamp() });
