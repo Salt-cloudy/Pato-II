@@ -17,7 +17,7 @@
 // navegador nunca vio, garantizando HTML/JS realmente fresco.
 (function(){
   try{
-    var BUILD_ID='1.58';
+    var BUILD_ID='1.59';
     if(sessionStorage.getItem('pato2_cachebust_done'))return;
     var ctrl=(typeof AbortController!=='undefined')?new AbortController():null;
     var t=ctrl?setTimeout(function(){ctrl.abort();},3000):null;
@@ -1107,8 +1107,11 @@ function showTab(t,el){
   if(el)el.classList.add('active');
 }
 function setStatus(v){
-  if(!cur)return;
+  if(!cur){window._dbg?.('setStatus:noCur',{value:v});return;}
+  const _before=load(cur.id).status||'none';
   save(cur.id,{status:v});
+  const _after=load(cur.id).status||'none';
+  window._dbg?.('setStatus',{diseaseId:cur.id,value:v,before:_before,after:_after});
   updateStatusBtns(v);
   buildSidebar(document.getElementById('search').value);
   updateProgress();
@@ -2195,6 +2198,16 @@ const _origOk = window._ok;
 window._ok = function() { _origOk(); startTracking(); };
 
 // === PROGRESS SYNC ===
+// Log de diagnostico temporal (para rastrear el bug de reversion de estado sin
+// depender de capturas de pantalla): cada evento clave de sync escribe una entrada
+// chronologica en debugLog/{syncKey}. Se puede borrar una vez resuelto el bug.
+function _dbg(type,extra){
+  try{
+    const bucket=syncKey||('nokey_'+deviceId);
+    push(ref(db,'debugLog/'+bucket),Object.assign({type,ts:serverTimestamp(),deviceId,ua:(navigator.userAgent||'').slice(0,80)},extra||{})).catch(()=>{});
+  }catch(e){}
+}
+window._dbg=_dbg;
 function scheduleSyncSave(){
   if(!syncKey)return;
   if(_syncTimer)clearTimeout(_syncTimer);
@@ -2216,6 +2229,7 @@ function flushProgressSync(){
     const statuses=_getDiseaseStatuses();
     const patch={favs:window._qFavs||{},favOnly:window._qFavOnly||false,lastSync:{'.sv':'timestamp'}};
     Object.keys(statuses).forEach(id=>{patch['diseases/'+id]=statuses[id];});
+    _dbg('flushPush',{ids:Object.keys(statuses).join(','),n:Object.keys(statuses).length});
     fetch(RTDB_URL+'/progress/'+encodeURIComponent(syncKey)+'.json',{
       method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch),keepalive:true
     }).catch(()=>{});
@@ -2249,15 +2263,17 @@ async function saveProgressToCloud(){
     const statuses=_getDiseaseStatuses();
     const patch={favs:window._qFavs||{},favOnly:window._qFavOnly||false,lastSync:serverTimestamp()};
     Object.keys(statuses).forEach(id=>{patch['diseases/'+id]=statuses[id];});
+    _dbg('debouncedPush',{ids:Object.keys(statuses).join(','),n:Object.keys(statuses).length});
     await update(ref(db,'progress/'+syncKey),patch);
   }catch(e){console.warn('Sync save:',e);}
 }
 
 async function loadProgressFromCloud(key){
   if(!key)return;
+  _dbg('pullStart',{key});
   try{
     const snap=await get(ref(db,'progress/'+key));
-    if(!snap.exists())return;
+    if(!snap.exists()){_dbg('pullEmpty',{key});return;}
     const data=snap.val();
     if(data.favs&&typeof data.favs==='object'){
       window._qFavs=data.favs;
@@ -2268,14 +2284,23 @@ async function loadProgressFromCloud(key){
       try{localStorage.setItem('pato2_quiz_fav_only',data.favOnly?'1':'0');}catch(e){}
     }
     if(data.diseases&&typeof data.diseases==='object'){
+      const changes=[];
       Object.keys(data.diseases).forEach(function(id){
-        try{localStorage.setItem('pato2_'+id,JSON.stringify(data.diseases[id]));}catch(e){}
+        try{
+          const before=localStorage.getItem('pato2_'+id);
+          const beforeStatus=before?(JSON.parse(before).status||'none'):'none';
+          const afterStatus=data.diseases[id]&&data.diseases[id].status||'none';
+          if(beforeStatus!==afterStatus)changes.push(id+':'+beforeStatus+'->'+afterStatus);
+          localStorage.setItem('pato2_'+id,JSON.stringify(data.diseases[id]));
+        }catch(e){}
       });
+      if(changes.length)_dbg('pullOverwrite',{changes:changes.join(', ')});
     }
+    _dbg('pullDone',{key});
     // Refresh UI after loading
     try{window.applyCloudSync&&window.applyCloudSync(data);}catch(e){}
     try{window.buildSidebar&&window.buildSidebar();}catch(e){}
-  }catch(e){console.warn('Sync load:',e);}
+  }catch(e){console.warn('Sync load:',e);_dbg('pullError',{msg:String(e).slice(0,100)});}
 }
 
 function initSync(key){
