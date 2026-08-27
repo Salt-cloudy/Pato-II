@@ -862,6 +862,7 @@ document.addEventListener('keydown',function(e){
   if(e.key==='ArrowRight'){e.preventDefault();nextHistoImg();}
   else if(e.key==='ArrowLeft'){e.preventDefault();prevHistoImg();}
 });
+let _spaceLastTime=0,_spaceLastShift=false;
 document.addEventListener('keydown',function(e){
   if(e.code!=='Space')return;
   const lb=document.getElementById('lightbox');
@@ -870,6 +871,11 @@ document.addEventListener('keydown',function(e){
   const tag=(document.activeElement&&document.activeElement.tagName)||'';
   if(tag==='INPUT'||tag==='TEXTAREA')return;
   e.preventDefault();
+  if(e.repeat)return;
+  const now=Date.now();
+  const isDouble=(now-_spaceLastTime)<1000&&_spaceLastShift===e.shiftKey;
+  if(!isDouble){_spaceLastTime=now;_spaceLastShift=e.shiftKey;return;}
+  _spaceLastTime=0;
   const items=[...document.querySelectorAll('#disease-list .disease-item')];
   const idx=items.findIndex(el=>el.classList.contains('active'));
   if(idx===-1)return;
