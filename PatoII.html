@@ -733,7 +733,7 @@ window.applyCloudSync=function(data){
 // STORAGE
 const key=id=>'pato2_'+id;
 const load=id=>JSON.parse(localStorage.getItem(key(id))||'{"status":"none"}');
-const save=(id,data)=>{const d=load(id);Object.assign(d,data);localStorage.setItem(key(id),JSON.stringify(d));window.scheduleSyncSave?.();};
+const save=(id,data)=>{const d=load(id);Object.assign(d,data);d.updatedAt=Date.now();localStorage.setItem(key(id),JSON.stringify(d));window.scheduleSyncSave?.();};
 
 // IMAGES
 const GITHUB_IMG_BASE='https://raw.githubusercontent.com/Salt-cloudy/Pato-II/main/';
@@ -1131,6 +1131,7 @@ function setStatus(v){
   const _before=load(cur.id).status||'none';
   save(cur.id,{status:v});
   const _after=load(cur.id).status||'none';
+  window._lastStatusId=cur.id;
   window._dbg?.('setStatus',{diseaseId:cur.id,value:v,before:_before,after:_after});
   updateStatusBtns(v);
   buildSidebar(document.getElementById('search').value);
@@ -1928,7 +1929,7 @@ document.addEventListener('keydown',function(e){
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js';
-import { getDatabase, ref, set, get, update, push, onValue, onDisconnect, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js';
+import { getDatabase, ref, set, get, update, push, onValue, onDisconnect, serverTimestamp, runTransaction } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js';
 import { getAnalytics, logEvent } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-analytics.js';
 import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
 
@@ -2101,7 +2102,15 @@ function startTracking() {
   onValue(ref(db, 'version/v'), snap => {
     const v = snap.val();
     if (_initVer === null) { _initVer = v; return; }
-    if (v !== null && v !== _initVer) { saveResumeState(); location.reload(); }
+    if (v !== null && v !== _initVer) {
+      saveResumeState();
+      // Esperar a que termine cualquier guardado de progreso pendiente antes de
+      // recargar por un deploy nuevo: sin esto, un reload disparado justo despues
+      // de marcar Visto/Dominada podia cortar el guardado a mitad de camino y el
+      // estado parecia "revertirse" al volver a abrir.
+      flushProgressSync();
+      Promise.race([saveProgressToCloud(), new Promise(r=>setTimeout(r,2000))]).finally(()=>location.reload());
+    }
   });
   restoreResumeState();
   // Write live stats every 60s so admin can see data even without session end
@@ -2194,12 +2203,16 @@ window.startQuiz = function() {
 const _origSetStatus = window.setStatus;
 window.setStatus = function(v) {
   _origSetStatus(v);
-  flushProgressSync();
-  // Segunda vía de guardado, por SDK/websocket en vez de fetch: el fetch con
-  // keepalive de flushProgressSync se parece a un beacon de tracking y algunos
-  // bloqueadores/extensiones lo descartan en silencio (confirmado via debugLog:
-  // el flush se ejecutaba pero nunca llegaba a la base de datos). update() usa
-  // la misma conexion websocket que ya usan presencia/sesiones, que si funciona.
+  // NO se llama flushProgressSync() aca: ese fetch PATCH es un guardado ciego sin
+  // chequeo de updatedAt (existe solo como red de seguridad para pagehide/beforeunload,
+  // donde no hay tiempo de esperar una transaccion). Llamarlo en cada click pisaba
+  // la proteccion de pushSingleStatus/saveProgressToCloud de abajo.
+  //
+  // pushSingleStatus usa una transaccion SDK/websocket: si otro dispositivo con el
+  // mismo codigo ya escribio un cambio mas nuevo para esta MISMA enfermedad, este
+  // push se aborta en vez de pisarlo (evita que 2 dispositivos con el mismo codigo
+  // se corrijan el estado entre si al alternar de uno a otro).
+  if (window._lastStatusId) pushSingleStatus(window._lastStatusId).catch(()=>{});
   saveProgressToCloud().catch(()=>{});
   if (!sessionActive || !currentDiseaseId) return;
   const action = v === 'dominated' ? 'domine' : v === 'weak' ? 'me_falta' : v;
@@ -2283,13 +2296,47 @@ function _getDiseaseStatuses(){
   return result;
 }
 
+// Push de una sola enfermedad via transaccion: si otro dispositivo con el mismo
+// syncKey ya escribio un updatedAt mas nuevo para este mismo id, la transaccion
+// se aborta (no pisa el cambio ajeno). Esta es la via principal de guardado al
+// hacer click en Visto/Dominada/Debil; saveProgressToCloud/flushProgressSync
+// quedan como respaldo best-effort para el resto del progreso.
+async function pushSingleStatus(id){
+  if(!syncKey||!id)return;
+  try{
+    const raw=localStorage.getItem('pato2_'+id);
+    if(!raw)return;
+    const localData=JSON.parse(raw);
+    _dbg('txnPush',{id,localUpdatedAt:localData.updatedAt||0});
+    await runTransaction(ref(db,'progress/'+syncKey+'/diseases/'+id),cloudVal=>{
+      if(!cloudVal||!cloudVal.updatedAt||(localData.updatedAt||0)>=cloudVal.updatedAt)return localData;
+      return; // abort: lo que hay en la nube es mas nuevo que lo local, no pisar
+    });
+  }catch(e){_dbg('txnPushError',{id,msg:String(e).slice(0,100)});}
+}
+
 async function saveProgressToCloud(){
   if(!syncKey)return;
   try{
     const statuses=_getDiseaseStatuses();
+    // Leer lo que hay en la nube antes de pisar: si otro dispositivo con el mismo
+    // codigo ya escribio un updatedAt mas nuevo para alguna enfermedad que este
+    // dispositivo tambien conoce (localStorage desactualizado), no se incluye en
+    // el patch — evita que este push "de respaldo" (que manda TODO lo que sabe
+    // este dispositivo) pise un cambio ajeno mas reciente.
+    const cloudSnap=await get(ref(db,'progress/'+syncKey+'/diseases'));
+    const cloudDiseases=cloudSnap.val()||{};
     const patch={favs:window._qFavs||{},favOnly:window._qFavOnly||false,lastSync:serverTimestamp()};
-    Object.keys(statuses).forEach(id=>{patch['diseases/'+id]=statuses[id];});
-    _dbg('debouncedPush',{ids:Object.keys(statuses).join(','),n:Object.keys(statuses).length});
+    let n=0;
+    Object.keys(statuses).forEach(id=>{
+      const cloudEntry=cloudDiseases[id];
+      const cloudTs=cloudEntry&&cloudEntry.updatedAt||0;
+      const localTs=statuses[id].updatedAt||0;
+      if(cloudEntry&&cloudTs>localTs)return;
+      patch['diseases/'+id]=statuses[id];
+      n++;
+    });
+    _dbg('debouncedPush',{ids:Object.keys(statuses).join(','),n});
     await update(ref(db,'progress/'+syncKey),patch);
   }catch(e){console.warn('Sync save:',e);}
 }
@@ -2310,17 +2357,26 @@ async function loadProgressFromCloud(key){
       try{localStorage.setItem('pato2_quiz_fav_only',data.favOnly?'1':'0');}catch(e){}
     }
     if(data.diseases&&typeof data.diseases==='object'){
-      const changes=[];
+      const changes=[],skipped=[];
       Object.keys(data.diseases).forEach(function(id){
         try{
           const before=localStorage.getItem('pato2_'+id);
-          const beforeStatus=before?(JSON.parse(before).status||'none'):'none';
-          const afterStatus=data.diseases[id]&&data.diseases[id].status||'none';
+          const beforeParsed=before?JSON.parse(before):null;
+          const beforeStatus=beforeParsed?(beforeParsed.status||'none'):'none';
+          const cloudEntry=data.diseases[id]||{};
+          const afterStatus=cloudEntry.status||'none';
+          // No pisar un cambio local si es igual o mas nuevo que lo que trae la nube
+          // (evita que un pull "atrasado" revierta un click reciente que todavia no
+          // habia llegado a la nube cuando se disparo este pull).
+          const localTs=beforeParsed&&beforeParsed.updatedAt||0;
+          const cloudTs=cloudEntry.updatedAt||0;
+          if(beforeParsed&&localTs>=cloudTs&&localTs>0){skipped.push(id);return;}
           if(beforeStatus!==afterStatus)changes.push(id+':'+beforeStatus+'->'+afterStatus);
-          localStorage.setItem('pato2_'+id,JSON.stringify(data.diseases[id]));
+          localStorage.setItem('pato2_'+id,JSON.stringify(cloudEntry));
         }catch(e){}
       });
       if(changes.length)_dbg('pullOverwrite',{changes:changes.join(', ')});
+      if(skipped.length)_dbg('pullSkippedNewer',{ids:skipped.join(',')});
     }
     _dbg('pullDone',{key});
     // Refresh UI after loading
