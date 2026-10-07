@@ -300,6 +300,7 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--ac
           <th>Dominé</th>
           <th>Me falta</th>
           <th>🔬 Micro</th>
+          <th>🔥 Fogueo</th>
           <th class="col-hide">↺ Otra vez</th>
 
         </tr></thead>
@@ -358,6 +359,14 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--ac
       <button class="btn btn-s" onclick="closeM('m-edit')">Cancelar</button>
       <button class="btn btn-p" onclick="saveEdit()">Guardar</button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL FOGUEO (detalle) -->
+<div class="ov" id="m-fog">
+  <div class="modal" style="width:620px;max-height:88vh;overflow-y:auto">
+    <div id="fog-detail-body"></div>
+    <div class="mact"><button class="btn btn-s" onclick="closeM('m-fog')">Cerrar</button></div>
   </div>
 </div>
 
@@ -460,7 +469,7 @@ window.login=async function(){
 };
 document.getElementById('li').addEventListener('keydown',e=>{if(e.key==='Enter')window.login();});
 
-let D={codes:{},devices:{},codeDevices:{},presence:{},alerts:{},sessions:{},microStats:{},userStats:{}};
+let D={codes:{},devices:{},codeDevices:{},presence:{},alerts:{},sessions:{},microStats:{},userStats:{},fogueo:{}};
 let currentTab='dash';
 
 function init(){
@@ -472,6 +481,7 @@ function init(){
   onValue(ref(db,'sessions'),s=>{D.sessions=s.val()||{};renderStats();});
   onValue(ref(db,'microStats'),s=>{D.microStats=s.val()||{};renderStats();});
   onValue(ref(db,'userStats'),s=>{D.userStats=s.val()||{};renderStats();});
+  onValue(ref(db,'fogueo'),s=>{D.fogueo=s.val()||{};renderStats();});
 }
 
 function render(){ renderDash();renderUsers();renderArchived();renderCodes();renderStats(); }
@@ -595,7 +605,7 @@ function renderStats(){
   const stArch=document.getElementById('st-archived');
   if(stTotal)stTotal.textContent=allDevs.length;
   if(stArch)stArch.textContent=allDevs.filter(([,d])=>d.archived).length;
-  if(!active.length){tb.innerHTML='<tr><td colspan="13" class="empty">Sin datos.</td></tr>';return;}
+  if(!active.length){tb.innerHTML='<tr><td colspan="14" class="empty">Sin datos.</td></tr>';return;}
 
   // Group by name: one row per person even if they have multiple devices
   const byName={};
@@ -603,7 +613,7 @@ function renderStats(){
     const name=d.codeName||'Dueño';
     const _us=D.userStats[did]||{};
     if(!byName[name]){
-      byName[name]={name,lastSeen:0,clicks:0,sessions:0,totalTime:0,longest:0,quiz:0,domine:0,meFalta:0,micro:0,microOtraVez:0,microMin6:0,microMin10:0,microDia1:0,microBien:0,microDificil:0,idleTime:0,estudioInt:0};
+      byName[name]={name,lastSeen:0,clicks:0,sessions:0,totalTime:0,longest:0,quiz:0,domine:0,meFalta:0,micro:0,microOtraVez:0,microMin6:0,microMin10:0,microDia1:0,microBien:0,microDificil:0,idleTime:0,estudioInt:0,fogRuns:[],fogActivo:null};
     }
     const g=byName[name];
     if((d.lastSeen||0)>g.lastSeen)g.lastSeen=d.lastSeen||0;
@@ -619,6 +629,9 @@ function renderStats(){
     g.microDificil+=(_us.micro_dificil||0);
     g.idleTime+=(_us.idle_s||0);
     g.estudioInt+=(_us.estudioInt||0);
+    const _fg=D.fogueo[did]||{};
+    if(_fg.activo&&!g.fogActivo)g.fogActivo=_fg.activo;
+    g.fogRuns=g.fogRuns.concat(Object.values(_fg.runs||{}));
   }
   const didToName={};
   for(const[did,d] of active)didToName[did]=d.codeName||'Dueño';
@@ -635,7 +648,8 @@ function renderStats(){
     if(dur>g.longest)g.longest=dur;
     g.quiz+=(sum.quizStarts||live.quizStarts||s.quizStarts||0);
   }
-  tb.innerHTML=Object.values(byName).sort((a,b)=>(b.clicks||0)-(a.clicks||0)).map(st=>`<tr>
+  fogGroupsList=Object.values(byName).sort((a,b)=>(b.clicks||0)-(a.clicks||0));
+  tb.innerHTML=fogGroupsList.map((st,fi)=>`<tr>
     <td><b>${st.name}</b></td>
     <td data-label="Clics">${st.clicks||'—'}</td>
     <td data-label="Sesiones">${st.sessions||'—'}</td>
@@ -648,9 +662,52 @@ function renderStats(){
     <td data-label="Dominé">${st.domine||'—'}</td>
     <td data-label="Me falta">${st.meFalta||'—'}</td>
     <td data-label="🔬 Micro">${st.micro ? `${st.micro} <small style="color:var(--text2)">(6m${st.microMin6}·10m${st.microMin10}·1d${st.microDia1})</small>` : '—'}</td>
+    <td data-label="🔥 Fogueo">${fogCellHtml(st,fi)}</td>
     <td class="col-hide" data-label="↺ Otra vez">${st.microOtraVez||'—'}</td>
   </tr>`).join('');
 }
+
+/* ── FOGUEO (detalle por persona) ── */
+let fogGroupsList=[];
+function fogEscA(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fogMarkTxt(m){return m==='dom'?'<b style="color:#2e7d32">Domine</b>':m==='falta'?'<b style="color:#c62828">Aún me falta</b>':'<span style="color:var(--text2)">sin marcar</span>';}
+function fogLastStart(st){
+  const starts=(st.fogRuns||[]).map(r=>r.fecha||0);
+  if(st.fogActivo&&st.fogActivo.fecha)starts.push(st.fogActivo.fecha);
+  return starts.length?Math.max(...starts):0;
+}
+function fogCellHtml(st,fi){
+  const last=fogLastStart(st);
+  if(!last)return'—';
+  const n=(st.fogRuns||[]).length;
+  return `<a href="#" onclick="openFogDetail(${fi});return false" style="color:var(--accent)">${fmt(last)}</a> <small style="color:var(--text2)">(${n} ${n===1?'práctica':'prácticas'}${st.fogActivo?' · en curso':''})</small>`;
+}
+window.openFogDetail=function(fi){
+  const st=fogGroupsList[fi];if(!st)return;
+  const runs=(st.fogRuns||[]).slice().sort((a,b)=>(a.fecha||0)-(b.fecha||0));
+  const latest={};
+  runs.forEach(r=>{
+    (r.micro||[]).forEach(m=>{if(m.mark)latest['M|'+m.name]={label:m.name,mark:m.mark};});
+    (r.cases||[]).forEach(c=>{if(c.mark)latest['C|'+c.dx]={label:c.dx,mark:c.mark};});
+  });
+  const items=Object.values(latest);
+  const dom=items.filter(x=>x.mark==='dom'),falta=items.filter(x=>x.mark==='falta');
+  const list=arr=>arr.length?arr.map(x=>fogEscA(x.label)).join('<br>'):'<span style="color:var(--text2)">ninguno</span>';
+  const act=st.fogActivo?`<p><b>En curso desde:</b> ${fmt(st.fogActivo.fecha)} (fase: ${fogEscA(st.fogActivo.fase||'?')})</p>`:'';
+  let html=`<h3>🔥 Fogueo — ${fogEscA(st.name)}</h3>`
+    +`<p><b>Prácticas terminadas:</b> ${runs.length}</p>${act}`
+    +`<p><b>Dominado:</b> ${dom.length} &nbsp;·&nbsp; <b>Aún le falta:</b> ${falta.length}</p>`
+    +`<p><b>Lo que domina:</b><br>${list(dom)}</p>`
+    +`<p><b>Lo que le falta:</b><br>${list(falta)}</p><hr style="border:0;border-top:1px solid var(--border);margin:12px 0">`;
+  html+=runs.slice().reverse().map((r,k)=>{
+    const num=runs.length-k;
+    const micro=(r.micro||[]).map(m=>`<li>${fogEscA(m.name)} — ${fogMarkTxt(m.mark)}</li>`).join('');
+    const cases=(r.cases||[]).map(c=>`<div style="margin:8px 0;padding:8px 10px;border-left:3px solid var(--accent)"><b>Caso: ${fogEscA(c.dx)}</b> — ${fogMarkTxt(c.mark)}<br><small>Diagnóstico escrito: ${c.ansDx?fogEscA(c.ansDx):'vacío'}</small><br><small>Características escritas: ${c.ansMicro?fogEscA(c.ansMicro).replace(/\n/g,'<br>'):'vacío'}</small></div>`).join('');
+    return `<div style="margin-bottom:16px"><h4>Práctica ${num} · ${fmt(r.fecha)}${r.fin?' → '+fmt(r.fin):''}</h4><b>Imágenes del microscopio:</b><ul>${micro||'<li>—</li>'}</ul><b>Casos:</b>${cases||'<p>—</p>'}</div>`;
+  }).join('')||'<p>Todavía no ha terminado ningún fogueo.</p>';
+  document.getElementById('fog-detail-body').innerHTML=html;
+  document.getElementById('m-fog').classList.add('op');
+};
 
 /* ── ALERTAS ── */
 function renderAlerts(){
@@ -868,7 +925,7 @@ window.forceReloadAll = async function() {
     const parts = String(cur).split('.');
     const next = parts[0] + '.' + (parseInt(parts[1] || '0') + 1);
     await set(ref(db, 'version/v'), next);
-    msg.textContent = `✓ Enviado (v${next}) — todos se recargarán en segundos`;
+    msg.textContent = `✓ Enviado (v${next}) — todos se recargarán y volverán justo a donde estaban`;
     msg.style.color = '#16a34a';
   } catch(e) {
     msg.textContent = 'Error: ' + e.message;
