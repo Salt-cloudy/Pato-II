@@ -2097,7 +2097,7 @@ function fogShowImage() {
 function fogImageView() {
   const c = fogRun.picks[fogRun.idx];
   fogBody('<div class="sim-head"><span>Imagen ' + (fogRun.idx + 1) + ' de ' + FOG_COUNT + '</span><span class="fog-hd-r"><span id="fog-cd" class="sim-cd"></span>' + fogPass() + '</span></div>'
-    + '<img class="sim-img" src="' + fogEsc(c.src) + '" alt="">');
+    + '<img class="sim-img" src="' + fogEsc(resolveImgUrl(c.src)) + '" alt="">');
 }
 function fogChange() {
   fogRun.phase = 'change';
@@ -2130,7 +2130,7 @@ function fogRenderReveal() {
   const allMarked = r.picks.every(function(p) { return !!p.mark; });
   fogBody('<div class="micro-select-title">Respuestas</div>'
     + r.picks.map(function(p, i) {
-        return '<div class="sim-reveal"><img src="' + fogEsc(p.src) + '" alt=""><div class="fog-mark-col"><div class="sim-reveal-name">' + (i + 1) + '. ' + fogEsc(p.name) + '</div>'
+        return '<div class="sim-reveal"><img src="' + fogEsc(resolveImgUrl(p.src)) + '" alt=""><div class="fog-mark-col"><div class="sim-reveal-name">' + (i + 1) + '. ' + fogEsc(p.name) + '</div>'
           + fogMarkBtns('micro', i, p.mark) + '</div></div>';
       }).join('')
     + '<p class="fog-hint">' + (allMarked ? '' : 'Marca Domine o Aún me falta en las 3 imágenes para continuar.') + '</p>'
@@ -2301,7 +2301,7 @@ function fogHistory() {
     const e = h[n];
     html += '<div class="fog-hist"><div class="fog-hist-title">Práctica ' + (n + 1) + ' <span>' + fogEsc(fogDate(e.fecha)) + '</span></div>'
       + '<div class="fog-hist-micro">' + (e.micro || []).map(function(m) {
-          return '<figure><img src="' + fogEsc(m.src) + '" alt="" onclick="openLightbox(this.src)"><figcaption>' + fogEsc(m.name) + '</figcaption>' + fogMarkTag(m.mark) + '</figure>';
+          return '<figure><img src="' + fogEsc(resolveImgUrl(m.src)) + '" alt="" onclick="openLightbox(this.src)"><figcaption>' + fogEsc(m.name) + '</figcaption>' + fogMarkTag(m.mark) + '</figure>';
         }).join('') + '</div>'
       + (e.cases || []).map(function(c, i) { return fogHistCase(c, n, i); }).join('') + '</div>';
   }
