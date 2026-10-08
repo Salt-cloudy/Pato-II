@@ -2393,6 +2393,29 @@ if (!deviceId) {
   localStorage.setItem('pato2_deviceId', deviceId);
 }
 
+/* ── TRIMESTRES ── */
+// qNum: 0=feb-abr, 1=may-jul, 2=ago-oct, 3=nov-ene (pertenece al año en que cae noviembre)
+function quarterIndexFromDate(dt){
+  const y=dt.getFullYear(),m=dt.getMonth();
+  if(m===0)return(y-1)*4+3;
+  if(m>=1&&m<=3)return y*4+0;
+  if(m>=4&&m<=6)return y*4+1;
+  if(m>=7&&m<=9)return y*4+2;
+  return y*4+3;
+}
+function quarterKey(idx){
+  const qYear=Math.floor(idx/4),qNum=((idx%4)+4)%4;
+  return`${qYear}-${qNum}`;
+}
+function currentQuarterKey(){return quarterKey(quarterIndexFromDate(new Date()));}
+let myQ = null;
+function ensureQuarter(){ if(!myQ) myQ = currentQuarterKey(); return myQ; }
+function qp(path){ return `quarters/${ensureQuarter()}/${path}`; }
+async function resolveQuarterForHash(hash){
+  try{ const snap = await get(ref(db, `codeQuarterIndex/${hash}`)); return snap.val() || null; }
+  catch(e){ return null; }
+}
+
 const auth = getAuth(app);
 
 let _contentLoaded = false;
@@ -2484,7 +2507,7 @@ function restoreResumeState() {
 }
 
 window.microPushStats = function(stats) {
-  set(ref(db, 'microStats/' + deviceId), {
+  set(ref(db, qp('microStats/' + deviceId)), {
     totalReviews: stats.totalReviews || 0,
     resets: stats.resets || 0,
     lastActivity: serverTimestamp()
@@ -2494,11 +2517,11 @@ window.pushUserStats = function() {
   if (!deviceId) return;
   const s = getUserStats();
   s.lastActivity = serverTimestamp();
-  set(ref(db, 'userStats/' + deviceId), s);
+  set(ref(db, qp('userStats/' + deviceId)), s);
 };
 window.pushFogueo = function(data) {
   if (!deviceId) return;
-  set(ref(db, 'fogueo/' + deviceId), Object.assign({}, data, { lastActivity: serverTimestamp() }));
+  set(ref(db, qp('fogueo/' + deviceId)), Object.assign({}, data, { lastActivity: serverTimestamp() }));
 };
 
 const sessionId = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
@@ -2515,14 +2538,16 @@ let _syncTimer = null;
 
 function startTracking() {
   if (sessionActive) return;
+  ensureQuarter();
+  set(ref(db, `quarterIndex/${myQ}`), true);
   sessionActive = true; sessionStart = Date.now();
   activeTime = 0; visibleSince = document.hidden ? null : Date.now();
   setTimeout(function(){ if(typeof window.pushUserStats==='function') window.pushUserStats(); }, 2000);
   try{const _sa=JSON.parse(localStorage.getItem('pato2_access')||'null');if(_sa){if(_sa.permanent)initSync('owner');else if(_sa.hash)initSync(_sa.hash);}}catch(e){}
   const isNew = !localStorage.getItem('pato2_seen');
   if (isNew) localStorage.setItem('pato2_seen', '1');
-  set(ref(db, `sessions/${sessionId}`), { deviceId, startTime: serverTimestamp(), isNewDevice: isNew, appVersion: APP_VERSION });
-  const presRef = ref(db, `presence/${deviceId}`);
+  set(ref(db, qp(`sessions/${sessionId}`)), { deviceId, startTime: serverTimestamp(), isNewDevice: isNew, appVersion: APP_VERSION });
+  const presRef = ref(db, qp(`presence/${deviceId}`));
   // Re-set online on every reconnect (handles mobile app-switch disconnects)
   onValue(ref(db, '.info/connected'), snap => {
     if (snap.val() === true) {
@@ -2530,9 +2555,9 @@ function startTracking() {
       set(presRef, { online: true, status: 'online', lastSeen: serverTimestamp(), sessionId });
     }
   });
-  get(ref(db, `devices/${deviceId}`)).then(snap => {
+  get(ref(db, qp(`devices/${deviceId}`))).then(snap => {
     const d = snap.val() || {};
-    set(ref(db, `devices/${deviceId}`), {
+    set(ref(db, qp(`devices/${deviceId}`)), {
       firstSeen: d.firstSeen || serverTimestamp(),
       lastSeen: serverTimestamp(),
       totalSessions: (d.totalSessions || 0) + 1,
@@ -2559,7 +2584,7 @@ function startTracking() {
   // Write live stats every 60s so admin can see data even without session end
   setInterval(() => {
     if (!sessionActive) return;
-    set(ref(db, `sessions/${sessionId}/live`), {
+    set(ref(db, qp(`sessions/${sessionId}/live`)), {
       durationSeconds: Math.round(getActiveDuration() / 1000),
       totalClicks,
       quizStarts,
@@ -2574,7 +2599,7 @@ function flushDiseaseTime() {
   const secs = Math.round((Date.now() - diseaseViewStart) / 1000);
   if (secs < 1) return;
   diseaseTimes[currentDiseaseId] = (diseaseTimes[currentDiseaseId] || 0) + secs;
-  if (sessionActive) set(ref(db, `sessions/${sessionId}/diseases/${currentDiseaseId}`), { totalSeconds: diseaseTimes[currentDiseaseId], lastViewed: serverTimestamp() });
+  if (sessionActive) set(ref(db, qp(`sessions/${sessionId}/diseases/${currentDiseaseId}`)), { totalSeconds: diseaseTimes[currentDiseaseId], lastViewed: serverTimestamp() });
   diseaseViewStart = Date.now();
 }
 
@@ -2582,7 +2607,7 @@ function endSession() {
   if (!sessionActive) return;
   flushDiseaseTime();
   const duration = Math.round(getActiveDuration() / 1000);
-  set(ref(db, `sessions/${sessionId}/summary`), { endTime: serverTimestamp(), durationSeconds: duration, totalClicks, quizStarts });
+  set(ref(db, qp(`sessions/${sessionId}/summary`)), { endTime: serverTimestamp(), durationSeconds: duration, totalClicks, quizStarts });
   if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
   if (idleStartTime) {
     const _ik='pato2_ustat_idle_s';
@@ -2590,7 +2615,7 @@ function endSession() {
     idleStartTime=null;
     if(typeof window.pushUserStats==='function') window.pushUserStats();
   }
-  set(ref(db, `presence/${deviceId}`), { online: false, status: 'offline', lastSeen: serverTimestamp() });
+  set(ref(db, qp(`presence/${deviceId}`)), { online: false, status: 'offline', lastSeen: serverTimestamp() });
   sessionActive = false;
 }
 
@@ -2602,7 +2627,7 @@ document.addEventListener('visibilitychange', () => {
     if (sessionActive) {
       idleTimer = setTimeout(() => {
         idleStartTime = Date.now();
-        set(ref(db, `presence/${deviceId}`), { online: false, status: 'idle', lastSeen: serverTimestamp(), sessionId });
+        set(ref(db, qp(`presence/${deviceId}`)), { online: false, status: 'idle', lastSeen: serverTimestamp(), sessionId });
       }, 20 * 60 * 1000);
     }
   } else {
@@ -2615,7 +2640,7 @@ document.addEventListener('visibilitychange', () => {
     }
     visibleSince = Date.now();
     if (currentDiseaseId) diseaseViewStart = Date.now();
-    if (sessionActive) set(ref(db, `presence/${deviceId}`), { online: true, status: 'online', lastSeen: serverTimestamp(), sessionId });
+    if (sessionActive) set(ref(db, qp(`presence/${deviceId}`)), { online: true, status: 'online', lastSeen: serverTimestamp(), sessionId });
   }
 });
 window.addEventListener('beforeunload', endSession);
@@ -2623,7 +2648,7 @@ window.addEventListener('beforeunload', endSession);
 document.addEventListener('click', () => {
   if (!sessionActive) return;
   totalClicks++;
-  if (totalClicks % 5 === 0) set(ref(db, `sessions/${sessionId}/totalClicks`), totalClicks);
+  if (totalClicks % 5 === 0) set(ref(db, qp(`sessions/${sessionId}/totalClicks`)), totalClicks);
 });
 
 const _origSelectD = window.selectD;
@@ -2631,7 +2656,7 @@ window.selectD = function(d) {
   _origSelectD(d);
   if (!sessionActive) return;
   flushDiseaseTime(); currentDiseaseId = d.id; diseaseViewStart = Date.now();
-  push(ref(db, `sessions/${sessionId}/diseaseViews`), { diseaseId: d.id, time: serverTimestamp() });
+  push(ref(db, qp(`sessions/${sessionId}/diseaseViews`)), { diseaseId: d.id, time: serverTimestamp() });
   logEvent(analytics, 'disease_view', { disease_id: d.id });
 };
 
@@ -2639,7 +2664,7 @@ const _origStartQuiz = window.startQuiz;
 window.startQuiz = function() {
   _origStartQuiz();
   if (!sessionActive) return;
-  quizStarts++; set(ref(db, `sessions/${sessionId}/quizStarts`), quizStarts);
+  quizStarts++; set(ref(db, qp(`sessions/${sessionId}/quizStarts`)), quizStarts);
   logEvent(analytics, 'quiz_start');
 };
 
@@ -2659,7 +2684,7 @@ window.setStatus = function(v) {
   saveProgressToCloud().catch(()=>{});
   if (!sessionActive || !currentDiseaseId) return;
   const action = v === 'dominated' ? 'domine' : v === 'weak' ? 'me_falta' : v;
-  set(ref(db, `sessions/${sessionId}/mastery/${currentDiseaseId}`), { action, time: serverTimestamp() });
+  set(ref(db, qp(`sessions/${sessionId}/mastery/${currentDiseaseId}`)), { action, time: serverTimestamp() });
   logEvent(analytics, 'status_change', { disease_id: currentDiseaseId, status: action });
   if (v === 'dominated') incrementUserStat('domine');
   if (v === 'weak') incrementUserStat('meFalta');
@@ -2712,7 +2737,7 @@ function flushProgressSync(){
     const patch={favs:window._qFavs||{},favOnly:window._qFavOnly||false,lastSync:{'.sv':'timestamp'}};
     Object.keys(statuses).forEach(id=>{patch['diseases/'+id]=statuses[id];});
     _dbg('flushPush',{ids:Object.keys(statuses).join(','),n:Object.keys(statuses).length});
-    fetch(RTDB_URL+'/progress/'+encodeURIComponent(syncKey)+'.json',{
+    fetch(RTDB_URL+'/'+qp('progress/'+encodeURIComponent(syncKey))+'.json',{
       method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch),keepalive:true
     }).catch(()=>{});
   }catch(e){}
@@ -2751,7 +2776,7 @@ async function pushSingleStatus(id){
     if(!raw)return;
     const localData=JSON.parse(raw);
     _dbg('txnPush',{id,localUpdatedAt:localData.updatedAt||0});
-    await runTransaction(ref(db,'progress/'+syncKey+'/diseases/'+id),cloudVal=>{
+    await runTransaction(ref(db,qp('progress/'+syncKey+'/diseases/'+id)),cloudVal=>{
       if(!cloudVal||!cloudVal.updatedAt||(localData.updatedAt||0)>=cloudVal.updatedAt)return localData;
       return; // abort: lo que hay en la nube es mas nuevo que lo local, no pisar
     });
@@ -2767,7 +2792,7 @@ async function saveProgressToCloud(){
     // dispositivo tambien conoce (localStorage desactualizado), no se incluye en
     // el patch — evita que este push "de respaldo" (que manda TODO lo que sabe
     // este dispositivo) pise un cambio ajeno mas reciente.
-    const cloudSnap=await get(ref(db,'progress/'+syncKey+'/diseases'));
+    const cloudSnap=await get(ref(db,qp('progress/'+syncKey+'/diseases')));
     const cloudDiseases=cloudSnap.val()||{};
     const patch={favs:window._qFavs||{},favOnly:window._qFavOnly||false,lastSync:serverTimestamp()};
     let n=0;
@@ -2780,7 +2805,7 @@ async function saveProgressToCloud(){
       n++;
     });
     _dbg('debouncedPush',{ids:Object.keys(statuses).join(','),n});
-    await update(ref(db,'progress/'+syncKey),patch);
+    await update(ref(db,qp('progress/'+syncKey)),patch);
   }catch(e){console.warn('Sync save:',e);}
 }
 
@@ -2788,7 +2813,7 @@ async function loadProgressFromCloud(key){
   if(!key)return;
   _dbg('pullStart',{key});
   try{
-    const snap=await get(ref(db,'progress/'+key));
+    const snap=await get(ref(db,qp('progress/'+key)));
     if(!snap.exists()){_dbg('pullEmpty',{key});return;}
     const data=snap.val();
     if(data.favs&&typeof data.favs==='object'){
@@ -2854,11 +2879,13 @@ function getFingerprint() {
   } catch(e) { return ''; }
 }
 
-async function checkDeviceLock(hash) {
+async function checkDeviceLock(hash, qArg) {
+  const q = qArg || await resolveQuarterForHash(hash) || currentQuarterKey();
+  myQ = q;
   const fp = getFingerprint();
   const [devSnap, codeSnap] = await Promise.all([
-    get(ref(db, `codeDevices/${hash}`)),
-    get(ref(db, `codes/${hash}`))
+    get(ref(db, `quarters/${q}/codeDevices/${hash}`)),
+    get(ref(db, `quarters/${q}/codes/${hash}`))
   ]);
   const codeData = codeSnap.val() || {};
   const codeName = codeData.name || fbCodeName || 'Desconocido';
@@ -2867,7 +2894,7 @@ async function checkDeviceLock(hash) {
   // Already registered — add fingerprint retroactively if missing
   if (registered[deviceId]) {
     if (fp && !registered[deviceId].fingerprint) {
-      set(ref(db, `codeDevices/${hash}/${deviceId}/fingerprint`), fp);
+      set(ref(db, `quarters/${q}/codeDevices/${hash}/${deviceId}/fingerprint`), fp);
     }
     return true;
   }
@@ -2878,12 +2905,12 @@ async function checkDeviceLock(hash) {
   }
   const count = Object.keys(registered).length;
   if (count < maxDevices) {
-    await set(ref(db, `codeDevices/${hash}/${deviceId}`), { registeredAt: serverTimestamp(), fingerprint: fp });
-    set(ref(db, `devices/${deviceId}/codeName`), codeName);
-    set(ref(db, `devices/${deviceId}/codeHash`), hash);
+    await set(ref(db, `quarters/${q}/codeDevices/${hash}/${deviceId}`), { registeredAt: serverTimestamp(), fingerprint: fp });
+    set(ref(db, `quarters/${q}/devices/${deviceId}/codeName`), codeName);
+    set(ref(db, `quarters/${q}/devices/${deviceId}/codeHash`), hash);
     return true;
   }
-  push(ref(db, 'alerts'), { type: 'unauthorized_device', codeName, codeHash: hash, attemptDeviceId: deviceId, registeredCount: count, maxDevices, timestamp: serverTimestamp(), read: false });
+  push(ref(db, `quarters/${q}/alerts`), { type: 'unauthorized_device', codeName, codeHash: hash, attemptDeviceId: deviceId, registeredCount: count, maxDevices, timestamp: serverTimestamp(), read: false });
   return false;
 }
 
@@ -2892,9 +2919,9 @@ window.hideLock = async function() {
   const raw = localStorage.getItem('pato2_access');
   if (!raw) { _origHideLock(); return; }
   let access; try { access = JSON.parse(raw); } catch(e) { _origHideLock(); return; }
-  if (access.permanent) { await presyncBeforeLoad('owner'); await ensureContentLoaded(ACCESS_CFG.ownerHash); _origHideLock(); return; }
+  if (access.permanent) { ensureQuarter(); await presyncBeforeLoad('owner'); await ensureContentLoaded(ACCESS_CFG.ownerHash); _origHideLock(); return; }
   if (!access.hash) { _origHideLock(); return; }
-  const allowed = await checkDeviceLock(access.hash);
+  const allowed = await checkDeviceLock(access.hash, access.quarter);
   if (allowed) { await presyncBeforeLoad(access.hash); await ensureContentLoaded(access.hash); _origHideLock(); }
   else { localStorage.removeItem('pato2_access'); const e = document.getElementById('lock-error'); if (e) e.textContent = 'Este código ya está registrado en otro dispositivo.'; }
 };
@@ -2908,16 +2935,19 @@ window.tryCode = async function() {
   if (!hashed || hashed === ACCESS_CFG.ownerHash) { await _origTryCode(); return; }
   if (ACCESS_CFG.codes?.find(x => x.hash === hashed && new Date(x.expires) > new Date())) { await _origTryCode(); return; }
   try {
-    const snap = await get(ref(db, `codes/${hashed}`));
-    if (snap.exists()) {
-      const cd = snap.val();
-      if (new Date(cd.expires) > new Date()) {
-        localStorage.setItem('pato2_access', JSON.stringify({ hash: hashed, expires: cd.expires }));
-        fbCodeName = cd.name;
-        const allowed = await checkDeviceLock(hashed);
-        if (allowed) { await presyncBeforeLoad(hashed); await ensureContentLoaded(hashed); _origHideLock(); window._ok(); }
-        else { localStorage.removeItem('pato2_access'); const e = document.getElementById('lock-error'); if (e) e.textContent = 'Este código ya está registrado en otro dispositivo.'; }
-        return;
+    const q = await resolveQuarterForHash(hashed);
+    if (q) {
+      const snap = await get(ref(db, `quarters/${q}/codes/${hashed}`));
+      if (snap.exists()) {
+        const cd = snap.val();
+        if (new Date(cd.expires) > new Date()) {
+          localStorage.setItem('pato2_access', JSON.stringify({ hash: hashed, expires: cd.expires, quarter: q }));
+          fbCodeName = cd.name;
+          const allowed = await checkDeviceLock(hashed, q);
+          if (allowed) { await presyncBeforeLoad(hashed); await ensureContentLoaded(hashed); _origHideLock(); window._ok(); }
+          else { localStorage.removeItem('pato2_access'); const e = document.getElementById('lock-error'); if (e) e.textContent = 'Este código ya está registrado en otro dispositivo.'; }
+          return;
+        }
       }
     }
   } catch(e) {}
@@ -2928,9 +2958,9 @@ const _raw = localStorage.getItem('pato2_access');
 if (_raw) {
   try {
     const _a = JSON.parse(_raw);
-    if (_a.permanent) { presyncBeforeLoad('owner').then(() => ensureContentLoaded(ACCESS_CFG.ownerHash)).then(() => startTracking()); }
+    if (_a.permanent) { ensureQuarter(); presyncBeforeLoad('owner').then(() => ensureContentLoaded(ACCESS_CFG.ownerHash)).then(() => startTracking()); }
     else if (_a.hash) {
-      checkDeviceLock(_a.hash).then(ok => {
+      checkDeviceLock(_a.hash, _a.quarter).then(ok => {
         if (ok) { presyncBeforeLoad(_a.hash).then(() => ensureContentLoaded(_a.hash)).then(() => startTracking()); }
         else { localStorage.removeItem('pato2_access'); window.showLock && window.showLock(); const e = document.getElementById('lock-error'); if (e) e.textContent = 'Este código ya está registrado en otro dispositivo.'; }
       });

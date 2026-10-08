@@ -146,7 +146,7 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--ac
   .sh h2{font-size:.88rem}
   .sh-hint{display:none}
   .ai{flex-direction:column}
-  .col-hide,.col-hide-ses,.col-hide-cod{display:none!important}
+  .col-hide,.col-hide-ses,.col-hide-exp{display:none!important}
   .lock-box{padding:32px 22px}
   /* Estadisticas: tarjetas */
   #stats .tw{overflow-x:visible}
@@ -181,7 +181,8 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--ac
 <div id="admin">
   <div class="topbar">
     <span class="topbar-title">🧬 Pato II MT — Admin</span>
-    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap">
+      <select id="qsel" class="btn btn-s" onchange="onQuarterChange()" style="font-size:.72rem;padding:4px 8px;min-height:28px;max-width:190px" title="Trimestre"></select>
       <span class="online-pill">⬤ <span id="oc">0</span> en línea</span>
       <button class="btn btn-s" onclick="location.reload()" style="font-size:.72rem;padding:4px 10px;min-height:28px" title="Recargar">↻</button>
       <button class="btn btn-s" onclick="logout()" style="font-size:.72rem;padding:4px 10px;min-height:28px">Cerrar sesión</button>
@@ -266,8 +267,8 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--ac
       <table>
         <thead><tr>
           <th>Nombre</th>
-          <th class="col-hide-cod">Código</th>
-          <th>Vence</th>
+          <th>Código</th>
+          <th class="col-hide-exp">Vence</th>
           <th>Dispositivos</th>
           <th class="col-hide">Máx</th>
           <th>Estado</th>
@@ -283,6 +284,10 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--ac
     <div class="sg" style="margin-bottom:20px">
       <div class="sc"><div class="sn" id="st-total">0</div><div class="sl">Usuarios totales</div></div>
       <div class="sc"><div class="sn" id="st-archived">0</div><div class="sl">Archivados</div></div>
+    </div>
+    <div class="sh" style="align-items:flex-start;flex-wrap:wrap;gap:10px">
+      <h2 style="margin:0">Trimestres a mostrar</h2>
+      <div id="stats-qpicker" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"></div>
     </div>
     <div class="sh"><h2>Estadísticas por usuario activo</h2></div>
     <div class="tw">
@@ -420,6 +425,39 @@ const db = getDatabase(app);
 const fbAuth = getFbAuth(app);
 const ADMIN_EMAIL = 'admin@pato-ii-mt.local';
 
+/* ── TRIMESTRES ── */
+// qNum: 0=feb-abr, 1=may-jul, 2=ago-oct, 3=nov-ene (pertenece al año en que cae noviembre)
+function quarterIndexFromDate(dt){
+  const y=dt.getFullYear(),m=dt.getMonth();
+  if(m===0)return(y-1)*4+3;
+  if(m>=1&&m<=3)return y*4+0;
+  if(m>=4&&m<=6)return y*4+1;
+  if(m>=7&&m<=9)return y*4+2;
+  return y*4+3;
+}
+function quarterKey(idx){
+  const qYear=Math.floor(idx/4),qNum=((idx%4)+4)%4;
+  return`${qYear}-${qNum}`;
+}
+function quarterFromKey(key){
+  const[y,q]=key.split('-').map(Number);
+  return y*4+q;
+}
+function quarterLabel(key){
+  const[y,q]=key.split('-').map(Number);
+  const names=['febrero - abril','mayo - julio','agosto - octubre'];
+  if(q===3)return`noviembre ${y} - enero ${y+1}`;
+  return`${names[q]} ${y}`;
+}
+function currentQuarterKey(){return quarterKey(quarterIndexFromDate(new Date()));}
+function buildQuarterSequence(){
+  const idx=quarterIndexFromDate(new Date());
+  const arr=[];
+  for(let i=idx-4;i<=idx+2;i++)arr.push(quarterKey(i));
+  return arr;
+}
+function qp(path){return`quarters/${selectedQuarter}/${path}`;}
+
 async function sha256(m){
   const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(m));
   return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
@@ -452,39 +490,113 @@ window.login=async function(){
   if(!v)return;
   const h=await sha256(v.toUpperCase());
   if(h===OWNER){
-    setAuth(h);
+    const vU=v.toUpperCase();
+    let authOk=false;
     try {
-      await signInWithEmailAndPassword(fbAuth, ADMIN_EMAIL, v);
+      await signInWithEmailAndPassword(fbAuth, ADMIN_EMAIL, vU);
+      authOk=true;
     } catch(err) {
       try {
-        await createUserWithEmailAndPassword(fbAuth, ADMIN_EMAIL, v);
+        await createUserWithEmailAndPassword(fbAuth, ADMIN_EMAIL, vU);
+        authOk=true;
       } catch(err2) {
         console.error('Firebase Auth setup failed:', err2);
       }
     }
-    showAdmin();
+    if(authOk){
+      setAuth(h);
+      showAdmin();
+    } else {
+      document.getElementById('le').textContent='La contraseña abre el panel pero no coincide con la cuenta de Firebase Auth. Avisa para sincronizarla.';
+    }
   } else {
     document.getElementById('le').textContent='Contraseña incorrecta.';
   }
 };
 document.getElementById('li').addEventListener('keydown',e=>{if(e.key==='Enter')window.login();});
 
-let D={codes:{},devices:{},codeDevices:{},presence:{},alerts:{},sessions:{},microStats:{},userStats:{},fogueo:{}};
+let D={codes:{},devices:{},codeDevices:{},presence:{},alerts:{},sessions:{},microStats:{},userStats:{},quarterIndex:{}};
+let STD={devices:{},sessions:{},microStats:{},userStats:{},fogueo:{}};
 let currentTab='dash';
 
-function init(){
-  onValue(ref(db,'presence'),s=>{D.presence=s.val()||{};render();});
-  onValue(ref(db,'devices'),s=>{D.devices=s.val()||{};render();});
-  onValue(ref(db,'codes'),s=>{D.codes=s.val()||{};render();});
-  onValue(ref(db,'codeDevices'),s=>{D.codeDevices=s.val()||{};render();});
-  onValue(ref(db,'alerts'),s=>{D.alerts=s.val()||{};renderAlerts();});
-  onValue(ref(db,'sessions'),s=>{D.sessions=s.val()||{};renderStats();});
-  onValue(ref(db,'microStats'),s=>{D.microStats=s.val()||{};renderStats();});
-  onValue(ref(db,'userStats'),s=>{D.userStats=s.val()||{};renderStats();});
-  onValue(ref(db,'fogueo'),s=>{D.fogueo=s.val()||{};renderStats();});
+let selectedQuarter=null;
+let mainUnsubs=[];
+let statsUnsubs=[];
+let statsSel=new Set();
+let statsSelAll=false;
+
+function detachMain(){mainUnsubs.forEach(u=>u());mainUnsubs=[];}
+function attachMainListeners(q){
+  detachMain();
+  D.presence={};D.devices={};D.codes={};D.codeDevices={};D.alerts={};D.sessions={};D.microStats={};D.userStats={};
+  ['presence','devices','codes','codeDevices','alerts','sessions','microStats','userStats'].forEach(p=>{
+    mainUnsubs.push(onValue(ref(db,`quarters/${q}/${p}`),s=>{D[p]=s.val()||{};render();if(p==='alerts')renderAlerts();}));
+  });
 }
 
-function render(){ renderDash();renderUsers();renderArchived();renderCodes();renderStats(); }
+function detachStats(){statsUnsubs.forEach(u=>u());statsUnsubs=[];}
+function reattachStatsListeners(){
+  detachStats();
+  STD={devices:{},sessions:{},microStats:{},userStats:{},fogueo:{}};
+  const keys=statsSelAll?Object.keys(D.quarterIndex||{}):[...statsSel];
+  keys.forEach(q=>{
+    ['devices','sessions','microStats','userStats','fogueo'].forEach(p=>{
+      statsUnsubs.push(onValue(ref(db,`quarters/${q}/${p}`),s=>{
+        const val=s.val()||{};
+        Object.keys(STD[p]).forEach(k=>{if(k.startsWith(q+'::'))delete STD[p][k];});
+        Object.entries(val).forEach(([id,v])=>{STD[p][`${q}::${id}`]=v;});
+        renderStats();
+      }));
+    });
+  });
+  renderStatsQPicker();
+  renderStats();
+}
+
+window.onQuarterChange=function(){
+  const v=document.getElementById('qsel').value;
+  if(!v)return;
+  selectedQuarter=v;
+  try{localStorage.setItem('pato2_admin_quarter',v);}catch(e){}
+  attachMainListeners(v);
+};
+
+window.onStatsQToggleAll=function(checked){
+  statsSelAll=checked;
+  if(checked)statsSel=new Set(Object.keys(D.quarterIndex||{}));
+  reattachStatsListeners();
+};
+window.onStatsQChange=function(){
+  statsSelAll=false;
+  statsSel=new Set([...document.querySelectorAll('.stq-cb:checked')].map(cb=>cb.value));
+  reattachStatsListeners();
+};
+function renderStatsQPicker(){
+  const el=document.getElementById('stats-qpicker');
+  if(!el)return;
+  const keys=Object.keys(D.quarterIndex||{}).sort((a,b)=>quarterFromKey(a)-quarterFromKey(b));
+  if(!keys.length){el.innerHTML='<span style="font-size:.75rem;color:var(--text3)">Sin trimestres con datos.</span>';return;}
+  el.innerHTML=`<label style="font-size:.75rem;display:inline-flex;align-items:center;gap:4px;cursor:pointer;padding:4px 8px;border:1px solid var(--border);border-radius:8px"><input type="checkbox" id="stq-all" ${statsSelAll?'checked':''} onchange="onStatsQToggleAll(this.checked)"><b>Todos</b></label>`+
+    keys.map(k=>`<label style="font-size:.75rem;display:inline-flex;align-items:center;gap:4px;cursor:pointer;padding:4px 8px;border:1px solid var(--border);border-radius:8px"><input type="checkbox" class="stq-cb" value="${k}" ${(statsSelAll||statsSel.has(k))?'checked':''} ${statsSelAll?'disabled':''} onchange="onStatsQChange()">${quarterLabel(k)}</label>`).join('');
+}
+
+function init(){
+  onValue(ref(db,'quarterIndex'),s=>{D.quarterIndex=s.val()||{};renderStatsQPicker();});
+  const seq=buildQuarterSequence();
+  let saved=null;try{saved=localStorage.getItem('pato2_admin_quarter');}catch(e){}
+  if(saved&&!seq.includes(saved))seq.push(saved);
+  seq.sort((a,b)=>quarterFromKey(a)-quarterFromKey(b));
+  const curQ=currentQuarterKey();
+  const sel=document.getElementById('qsel');
+  sel.innerHTML=seq.map(k=>`<option value="${k}">${quarterLabel(k)}${k===curQ?' (actual)':''}</option>`).join('');
+  selectedQuarter=(saved&&seq.includes(saved))?saved:curQ;
+  sel.value=selectedQuarter;
+  attachMainListeners(selectedQuarter);
+  statsSel=new Set([selectedQuarter]);
+  reattachStatsListeners();
+}
+
+function render(){ renderDash();renderUsers();renderArchived();renderCodes(); }
 
 /* ── DASHBOARD ── */
 function renderDash(){
@@ -582,8 +694,8 @@ function renderCodes(){
     const maxD=c.maxDevices||1;
     return `<tr>
       <td><b>${c.name||'—'}</b></td>
-      <td class="col-hide-cod" style="font-family:monospace;color:var(--text2)">${c.plainCode||'••••••'}</td>
-      <td>${c.expires||'—'}</td>
+      <td style="font-family:monospace;color:var(--text2)">${c.plainCode||'••••••'}</td>
+      <td class="col-hide-exp">${c.expires||'—'}</td>
       <td>${devReg}/${maxD}</td>
       <td class="col-hide">${maxD}</td>
       <td>${st}</td>
@@ -599,7 +711,7 @@ function renderCodes(){
 function renderStats(){
   const tb=document.getElementById('stb');
   if(!tb)return;
-  const allDevs=Object.entries(D.devices);
+  const allDevs=Object.entries(STD.devices);
   const active=allDevs.filter(([,d])=>!d.archived);
   const stTotal=document.getElementById('st-total');
   const stArch=document.getElementById('st-archived');
@@ -607,11 +719,11 @@ function renderStats(){
   if(stArch)stArch.textContent=allDevs.filter(([,d])=>d.archived).length;
   if(!active.length){tb.innerHTML='<tr><td colspan="14" class="empty">Sin datos.</td></tr>';return;}
 
-  // Group by name: one row per person even if they have multiple devices
+  // Group by name: one row per person even if they have multiple devices (o varios trimestres)
   const byName={};
-  for(const[did,d] of active){
+  for(const[ckey,d] of active){
     const name=d.codeName||'Dueño';
-    const _us=D.userStats[did]||{};
+    const _us=STD.userStats[ckey]||{};
     if(!byName[name]){
       byName[name]={name,lastSeen:0,clicks:0,sessions:0,totalTime:0,longest:0,quiz:0,domine:0,meFalta:0,micro:0,microOtraVez:0,microMin6:0,microMin10:0,microDia1:0,microBien:0,microDificil:0,idleTime:0,estudioInt:0,fogRuns:[],fogActivo:null};
     }
@@ -620,7 +732,7 @@ function renderStats(){
     g.sessions+=(d.totalSessions||0);
     g.domine+=(_us.domine||0);
     g.meFalta+=(_us.meFalta||0);
-    g.micro+=(D.microStats[did]?.totalReviews||0);
+    g.micro+=(STD.microStats[ckey]?.totalReviews||0);
     g.microOtraVez+=(_us.micro_otraVez||0);
     g.microMin6+=(_us.micro_min6||0);
     g.microMin10+=(_us.micro_min10||0);
@@ -629,15 +741,16 @@ function renderStats(){
     g.microDificil+=(_us.micro_dificil||0);
     g.idleTime+=(_us.idle_s||0);
     g.estudioInt+=(_us.estudioInt||0);
-    const _fg=D.fogueo[did]||{};
+    const _fg=(STD.fogueo||{})[ckey]||{};
     if(_fg.activo&&!g.fogActivo)g.fogActivo=_fg.activo;
     g.fogRuns=g.fogRuns.concat(Object.values(_fg.runs||{}));
   }
   const didToName={};
-  for(const[did,d] of active)didToName[did]=d.codeName||'Dueño';
-  for(const[,s] of Object.entries(D.sessions)){
-    const did=s.deviceId;
-    const name=didToName[did];
+  for(const[ckey,d] of active)didToName[ckey]=d.codeName||'Dueño';
+  for(const[skey,s] of Object.entries(STD.sessions)){
+    const q=skey.slice(0,skey.indexOf('::'));
+    const ckey=`${q}::${s.deviceId}`;
+    const name=didToName[ckey];
     if(!name||!byName[name])continue;
     const g=byName[name];
     const sum=s.summary||{};
@@ -759,9 +872,19 @@ window.createCode=async function(){
   if(!name){err.textContent='Ingresa el nombre.';return;}
   if(!code){err.textContent='Ingresa el código.';return;}
   if(!exp){err.textContent='Selecciona fecha de vencimiento.';return;}
+  const curQ=currentQuarterKey();
+  if(selectedQuarter!==curQ){
+    const ok=confirm(`Estás creando este código en el trimestre "${quarterLabel(selectedQuarter)}", pero según la fecha de hoy el trimestre actual es "${quarterLabel(curQ)}".\n\n¿Seguro que quieres continuar?`);
+    if(!ok)return;
+  }
   try{
     const hash=await sha256(code);
-    await set(ref(db,`codes/${hash}`),{name,plainCode:code,expires:exp,expiresAt:new Date(exp).getTime(),maxDevices:maxD,createdAt:serverTimestamp()});
+    if(D.codes[hash]){err.textContent='Código ya asignado, intenta otro.';return;}
+    await update(ref(db),{
+      [qp(`codes/${hash}`)]:{name,plainCode:code,expires:exp,expiresAt:new Date(exp).getTime(),maxDevices:maxD,createdAt:serverTimestamp()},
+      [`codeQuarterIndex/${hash}`]:selectedQuarter,
+      [`quarterIndex/${selectedQuarter}`]:true
+    });
     window.closeM('m-create');
   }catch(e){err.textContent='Error al guardar: '+e.message;}
 };
@@ -781,11 +904,14 @@ window.openEdit=async function(hash){
   if(!Object.keys(devs).length){
     dl.innerHTML='<p style="color:var(--text3);font-size:.78rem;padding:6px">Sin dispositivos registrados.</p>';
   } else {
+    const asc=Object.entries(devs).sort((a,b)=>(a[1].registeredAt||0)-(b[1].registeredAt||0));
+    const numOf={};
+    asc.forEach(([did],i)=>{numOf[did]=i+1;});
     const sorted=Object.entries(devs).sort((a,b)=>(b[1].registeredAt||0)-(a[1].registeredAt||0));
     dl.innerHTML=sorted.map(([did,dv],i)=>`
       <div class="dev-row">
         <div style="min-width:0">
-          <span class="dev-id">${did}</span>
+          <span class="dev-id" title="${did}">Dispositivo ${numOf[did]}</span>
           <div style="font-size:.68rem;color:var(--text3);margin-top:2px">Registrado: ${fmt(dv.registeredAt)}${i===0?' <span style="color:#f59e0b;font-weight:600">&#9650; más nuevo</span>':''}</div>
         </div>
         <button class="btn btn-d" style="font-size:.71rem;padding:3px 9px;min-height:28px;flex-shrink:0" onclick="removeDevice('${hash}','${did}')">Liberar</button>
@@ -802,13 +928,13 @@ window.saveEdit=async function(){
   if(!name){err.textContent='Ingresa el nombre.';return;}
   if(!exp){err.textContent='Selecciona fecha.';return;}
   try{
-    await update(ref(db,`codes/${editHash}`),{name,expires:exp,expiresAt:new Date(exp).getTime(),maxDevices:maxD});
+    await update(ref(db,qp(`codes/${editHash}`)),{name,expires:exp,expiresAt:new Date(exp).getTime(),maxDevices:maxD});
     window.closeM('m-edit');
   }catch(e){err.textContent='Error al guardar: '+e.message;}
 };
 window.removeDevice=async function(hash,did){
   if(!confirm('¿Liberar este dispositivo? El usuario deberá registrarse de nuevo.'))return;
-  await remove(ref(db,`codeDevices/${hash}/${did}`));
+  await remove(ref(db,qp(`codeDevices/${hash}/${did}`)));
   window.openEdit(hash);
 };
 
@@ -816,8 +942,11 @@ window.removeDevice=async function(hash,did){
 window.delCode=async function(hash,name){
   if(!confirm(`¿Eliminar el código de ${name}?\nSe liberarán todos sus dispositivos.`))return;
   try{
-    await remove(ref(db,`codes/${hash}`));
-    await remove(ref(db,`codeDevices/${hash}`));
+    await update(ref(db),{
+      [qp(`codes/${hash}`)]:null,
+      [qp(`codeDevices/${hash}`)]:null,
+      [`codeQuarterIndex/${hash}`]:null
+    });
   }catch(e){alert('Error al eliminar: '+e.message);}
 };
 
@@ -832,16 +961,16 @@ window.dblUser=function(dids,isArchived){
     document.getElementById('act-desc').textContent=dids.length>1?`Se archivarán los ${dids.length} dispositivos de este usuario.`:'El usuario se moverá a Archivados. Puede seguir usando la app con normalidad.';
     btn2.style.display='none';
     btn.textContent='Archivar';btn.className='btn btn-w';
-    btn.onclick=async()=>{await Promise.all(dids.map(did=>set(ref(db,`devices/${did}/archived`),true)));window.closeM('m-action');};
+    btn.onclick=async()=>{await Promise.all(dids.map(did=>set(ref(db,qp(`devices/${did}/archived`)),true)));window.closeM('m-action');};
   } else {
     document.getElementById('act-desc').textContent='Elige qué hacer con este usuario archivado.';
     btn2.style.display='';
     btn2.textContent='Restaurar';
-    btn2.onclick=async()=>{await set(ref(db,`devices/${dids[0]}/archived`),false);window.closeM('m-action');};
+    btn2.onclick=async()=>{await set(ref(db,qp(`devices/${dids[0]}/archived`)),false);window.closeM('m-action');};
     btn.textContent='Eliminar';btn.className='btn btn-d';
     btn.onclick=async()=>{
       if(!confirm('¿Eliminar permanentemente del historial?'))return;
-      await remove(ref(db,`devices/${dids[0]}`));window.closeM('m-action');
+      await remove(ref(db,qp(`devices/${dids[0]}`)));window.closeM('m-action');
     };
   }
   document.getElementById('m-action').classList.add('op');
@@ -890,13 +1019,13 @@ window.bulkMain=function(){
     const checked=[...document.querySelectorAll('.asel:checked')];
     if(!checked.length)return;
     if(!confirm(`¿Restaurar ${checked.length} usuario(s)?`))return;
-    Promise.all(checked.map(cb=>set(ref(db,`devices/${cb.dataset.did}/archived`),false))).then(clearSelSilent);
+    Promise.all(checked.map(cb=>set(ref(db,qp(`devices/${cb.dataset.did}/archived`)),false))).then(clearSelSilent);
   } else {
     const checked=[...document.querySelectorAll('.usel:checked')];
     if(!checked.length)return;
     if(!confirm(`¿Archivar ${checked.length} usuario(s)?`))return;
     const dids=checked.flatMap(cb=>JSON.parse(cb.dataset.dids||'[]'));
-    Promise.all(dids.map(did=>set(ref(db,`devices/${did}/archived`),true))).then(clearSelSilent);
+    Promise.all(dids.map(did=>set(ref(db,qp(`devices/${did}/archived`)),true))).then(clearSelSilent);
   }
 };
 window.bulkDelete=function(){
@@ -907,7 +1036,7 @@ window.bulkDelete=function(){
   const dids=currentTab==='archived'
     ?checked.map(cb=>cb.dataset.did)
     :checked.flatMap(cb=>JSON.parse(cb.dataset.dids||'[]'));
-  Promise.all(dids.map(did=>remove(ref(db,`devices/${did}`)))).then(clearSelSilent);
+  Promise.all(dids.map(did=>remove(ref(db,qp(`devices/${did}`))))).then(clearSelSilent);
 };
 
 /* ── CERRAR SESIÓN ── */
@@ -937,9 +1066,9 @@ window.forceReloadAll = async function() {
 };
 
 /* ── ALERTAS ── */
-window.markRead=async function(id){await set(ref(db,`alerts/${id}/read`),true);};
+window.markRead=async function(id){await set(ref(db,qp(`alerts/${id}/read`)),true);};
 window.markAll=async function(){
-  await Promise.all(Object.keys(D.alerts).map(id=>set(ref(db,`alerts/${id}/read`),true)));
+  await Promise.all(Object.keys(D.alerts).map(id=>set(ref(db,qp(`alerts/${id}/read`)),true)));
 };
 </script>
 </body>
