@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon-mt.png">
 <title>Admin — Pato II MT</title>
 <style>
-:root{--bg:#13131f;--card:#1c1c2e;--border:#2a2a42;--accent:#e07020;--green:#4caf50;--red:#e53935;--yellow:#ffc107;--text:#e8e8f0;--text2:#8888aa;--text3:#44445a}
+:root{--bg:#13131f;--card:#1c1c2e;--border:#2a2a42;--accent:#3b82f6;--green:#4caf50;--red:#e53935;--yellow:#ffc107;--text:#e8e8f0;--text2:#8888aa;--text3:#44445a}
 *{margin:0;padding:0;box-sizing:border-box}
 html{background:var(--bg)}
 body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
@@ -200,13 +200,13 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--ac
   <div id="dash" class="pane on">
     <div class="sg">
       <div class="sc"><div class="sn" id="s-online">0</div><div class="sl">En línea ahora</div></div>
-      <div class="sc"><div class="sn" id="s-idle" style="color:#e07020">0</div><div class="sl">Idle (20+ min)</div></div>
+      <div class="sc"><div class="sn" id="s-idle" style="color:#3b82f6">0</div><div class="sl">Idle (20+ min)</div></div>
       <div class="sc"><div class="sn" id="s-active">0</div><div class="sl">Usuarios activos</div></div>
       <div class="sc"><div class="sn" id="s-codes">0</div><div class="sl">Códigos activos</div></div>
       <div class="sc"><div class="sn" id="s-alerts">0</div><div class="sl">Alertas sin leer</div></div>
     </div>
     <div style="padding:0 16px 16px">
-      <button id="btn-force-reload" class="btn btn-s" onclick="forceReloadAll()" style="background:#e07020;color:#fff;border:none;padding:8px 18px;border-radius:8px;font-size:.85rem;cursor:pointer;font-weight:600">↻ Actualizar a todos</button>
+      <button id="btn-force-reload" class="btn btn-s" onclick="forceReloadAll()" style="background:#3b82f6;color:#fff;border:none;padding:8px 18px;border-radius:8px;font-size:.85rem;cursor:pointer;font-weight:600">↻ Actualizar a todos</button>
       <span id="force-reload-msg" style="margin-left:10px;font-size:.8rem;color:var(--sub)"></span>
     </div>
     <div class="sh"><h2>Usuarios en línea ahora</h2></div>
@@ -534,7 +534,7 @@ function renderUsers(){
   tb.innerHTML=Object.values(byName).sort((a,b)=>b.lastSeen-a.lastSeen).map(g=>{
     const anyOnline=g.dids.some(did=>D.presence[did]?.online);
     const anyIdle=!anyOnline&&g.dids.some(did=>!D.presence[did]?.online&&D.presence[did]?.status==='idle');
-    const st=anyOnline?'<span class="pill g">En línea</span>':anyIdle?'<span class="pill" style="background:#e0702015;color:#e07020;border:1px solid #e0702040">Idle</span>':'<span class="pill gr">Offline</span>';
+    const st=anyOnline?'<span class="pill g">En línea</span>':anyIdle?'<span class="pill" style="background:#3b82f615;color:#3b82f6;border:1px solid #3b82f640">Idle</span>':'<span class="pill gr">Offline</span>';
     const didsJson=JSON.stringify(g.dids);
     return `<tr class="clickrow" ondblclick="dblUser(JSON.parse(this.dataset.dids),false)" data-dids='${didsJson}' title="Doble clic para archivar">
       <td><input type="checkbox" class="usel" data-dids='${didsJson}' onchange="updateBulk()"></td>
