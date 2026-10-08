@@ -390,7 +390,7 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--ac
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js';
-import { getDatabase, ref, set, get, remove, push, update, onValue, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js';
+import { getDatabase, ref, set, get, remove, push, update, onValue, serverTimestamp, query, orderByChild, equalTo } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js';
 import { getAuth as getFbAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
 
 const OWNER = '83f808c9955b7bc8303dd987cf98a0747b031a81d7f47b3abc63944e0bd4bc89';
@@ -474,6 +474,9 @@ function fmtTime(s){
   if(m>0)return`${m}m`;
   return`${s}s`;
 }
+
+const PRESENCE_STALE_MS=5*60*1000;
+function isOnline(p){return!!(p&&p.online&&(Date.now()-(p.lastSeen||0))<PRESENCE_STALE_MS);}
 
 function showAdmin(){
   document.getElementById('lock').style.display='none';
@@ -601,8 +604,8 @@ function render(){ renderDash();renderUsers();renderArchived();renderCodes(); }
 /* ── DASHBOARD ── */
 function renderDash(){
   const now=new Date();
-  const onl=Object.values(D.presence).filter(p=>p.online).length;
-  const idl=Object.values(D.presence).filter(p=>!p.online&&p.status==='idle').length;
+  const onl=Object.values(D.presence).filter(p=>isOnline(p)).length;
+  const idl=Object.values(D.presence).filter(p=>!isOnline(p)&&p.status==='idle').length;
   // Usuarios activos = no archivados con código vigente (o dueño sin codeHash)
   const activeUsers=Object.values(D.devices).filter(d=>{
     if(d.archived)return false;
@@ -617,7 +620,7 @@ function renderDash(){
   document.getElementById('s-active').textContent=activeUsers;
   document.getElementById('s-codes').textContent=activeCodes;
 
-  const onlineDevs=Object.entries(D.presence).filter(([,p])=>p.online);
+  const onlineDevs=Object.entries(D.presence).filter(([,p])=>isOnline(p));
   const ol=document.getElementById('online-list');
   if(!onlineDevs.length){ol.innerHTML='<p class="empty">Nadie conectado.</p>';return;}
   ol.innerHTML=`<div class="tw"><table><thead><tr><th>Nombre</th><th>Última actividad</th><th class="col-hide">Device ID</th></tr></thead><tbody>${
@@ -644,8 +647,8 @@ function renderUsers(){
     g.sessions+=(d.totalSessions||0);
   }
   tb.innerHTML=Object.values(byName).sort((a,b)=>b.lastSeen-a.lastSeen).map(g=>{
-    const anyOnline=g.dids.some(did=>D.presence[did]?.online);
-    const anyIdle=!anyOnline&&g.dids.some(did=>!D.presence[did]?.online&&D.presence[did]?.status==='idle');
+    const anyOnline=g.dids.some(did=>isOnline(D.presence[did]));
+    const anyIdle=!anyOnline&&g.dids.some(did=>!isOnline(D.presence[did])&&D.presence[did]?.status==='idle');
     const st=anyOnline?'<span class="pill g">En línea</span>':anyIdle?'<span class="pill" style="background:#3b82f615;color:#3b82f6;border:1px solid #3b82f640">Idle</span>':'<span class="pill gr">Offline</span>';
     const didsJson=JSON.stringify(g.dids);
     return `<tr class="clickrow" ondblclick="dblUser(JSON.parse(this.dataset.dids),false)" data-dids='${didsJson}' title="Doble clic para archivar">
@@ -932,9 +935,22 @@ window.saveEdit=async function(){
     window.closeM('m-edit');
   }catch(e){err.textContent='Error al guardar: '+e.message;}
 };
+async function cutOffDevice(did){
+  try{
+    await set(ref(db,qp(`devices/${did}/archived`)),true);
+    const q=query(ref(db,'approvedDevices'),orderByChild('deviceId'),equalTo(did));
+    const snap=await get(q);
+    if(snap.exists()){
+      const updates={};
+      snap.forEach(ch=>{updates[`approvedDevices/${ch.key}/approved`]=false;});
+      await update(ref(db),updates);
+    }
+  }catch(e){console.error('cutOffDevice',e);}
+}
 window.removeDevice=async function(hash,did){
   if(!confirm('¿Liberar este dispositivo? El usuario deberá registrarse de nuevo.'))return;
   await remove(ref(db,qp(`codeDevices/${hash}/${did}`)));
+  await cutOffDevice(did);
   window.openEdit(hash);
 };
 
@@ -942,11 +958,13 @@ window.removeDevice=async function(hash,did){
 window.delCode=async function(hash,name){
   if(!confirm(`¿Eliminar el código de ${name}?\nSe liberarán todos sus dispositivos.`))return;
   try{
+    const dids=Object.keys(D.codeDevices[hash]||{});
     await update(ref(db),{
       [qp(`codes/${hash}`)]:null,
       [qp(`codeDevices/${hash}`)]:null,
       [`codeQuarterIndex/${hash}`]:null
     });
+    await Promise.all(dids.map(did=>cutOffDevice(did)));
   }catch(e){alert('Error al eliminar: '+e.message);}
 };
 
