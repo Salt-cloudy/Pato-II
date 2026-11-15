@@ -141,7 +141,8 @@ html.light .disease-item.active{background:#3b7dd812}
 .badge-na{background:var(--card);color:var(--text3);border:1px solid var(--border)}
 .badge-other{background:#7c5cbf18;color:#a78bfa;border:1px solid #7c5cbf35}
 .histo-wrap{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
-.histo-img-box{flex:0 0 240px;background:var(--card2);border-radius:10px;overflow:hidden;border:1px solid var(--border)}
+.histo-img-col{flex:0 0 240px;display:flex;flex-direction:column;gap:8px}
+.histo-img-box{background:var(--card2);border-radius:10px;overflow:hidden;border:1px solid var(--border)}
 .histo-img-box img{width:100%;height:180px;object-fit:contain;display:block;background:var(--card2);touch-action:manipulation}
 .histo-img-footer{padding:7px 10px;display:flex;align-items:center;justify-content:space-between;gap:6px}
 .histo-img-label{font-size:.7rem;color:var(--text3)}
@@ -165,6 +166,23 @@ html.light .disease-item.active{background:#3b7dd812}
 #lb-prev:hover,#lb-next:hover{background:#fff5}
 #lb-close{padding:6px 20px;background:#fff2;border:1px solid #fff4;border-radius:8px;color:#fff;font-size:.9rem;cursor:pointer}
 #lb-close:hover{background:#fff4}
+.histo-compare-btn{width:100%;padding:7px 8px;background:var(--card);border:1px solid var(--border);border-radius:8px;font-size:.78rem;font-weight:600;color:var(--text2);cursor:pointer}
+.histo-compare-btn:hover{border-color:var(--accent);color:var(--accent)}
+#compare-picker-modal,#compare-modal{display:none;position:fixed;inset:0;background:#000a;z-index:3100;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 16px}
+#compare-picker-modal.open,#compare-modal.open{display:flex}
+#compare-picker-modal{z-index:3200;align-items:center}
+#compare-picker-box{background:var(--bg);border:1px solid var(--border);border-radius:14px;max-width:420px;width:100%;max-height:80vh;display:flex;flex-direction:column;padding:16px;gap:10px}
+#compare-picker-list{overflow-y:auto;flex:1}
+#compare-search{padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:.85rem;width:100%}
+#compare-box{background:var(--bg);border:1px solid var(--border);border-radius:14px;max-width:1500px;width:100%;padding:22px 26px;position:relative}
+#compare-close{position:absolute;top:18px;right:18px;padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text2);cursor:pointer;font-size:.84rem}
+#compare-close:hover{border-color:var(--accent);color:var(--accent)}
+.compare-title{font-size:1.2rem;font-weight:700;margin-bottom:18px;padding-right:110px}
+.compare-cols{display:flex;gap:26px;flex-wrap:wrap}
+.compare-col{flex:1;min-width:360px;background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:18px}
+.compare-col h4{font-size:1.1rem;margin-bottom:10px}
+.compare-col .histo-img-box img{height:380px;cursor:zoom-in}
+.compare-col .histo-info{font-size:.92rem;max-height:280px}
 .histo-info-col{flex:1;min-width:180px}
 .histo-info-wrap{position:relative}
 .histo-info{font-size:.86rem;line-height:1.9;color:var(--text2);white-space:pre-wrap;padding:2px 14px 2px 0;max-height:260px;overflow-y:auto}
@@ -244,7 +262,8 @@ html.light .disease-item.active{background:#3b7dd812}
 /* ── RESPONSIVE ─────────────────────────────────────── */
 @media(max-width:768px){
   .histo-wrap{flex-direction:column}
-  .histo-img-box{flex:none;width:100%}
+  .histo-img-col{flex:none;width:100%}
+  .compare-col .histo-img-box img{height:260px}
   .card-header{flex-direction:column}
   #quiz-config{padding:16px 14px}
   .qz-body{padding:12px 14px}
@@ -679,6 +698,23 @@ html.light .disease-item.active{background:#3b7dd812}
     <button id="lb-close" onclick="closeLightbox()">Cerrar ✕</button>
   </div>
 </div>
+<div id="compare-picker-modal">
+  <div id="compare-picker-box">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <h3 style="font-size:.95rem;font-weight:700">Comparar con...</h3>
+      <button onclick="closeComparePicker()" style="background:none;border:none;color:var(--text2);font-size:1.1rem;cursor:pointer">✕</button>
+    </div>
+    <input id="compare-search" type="text" placeholder="Buscar enfermedad..." oninput="renderComparePicker()">
+    <div id="compare-picker-list"></div>
+  </div>
+</div>
+<div id="compare-modal">
+  <div id="compare-box">
+    <button id="compare-close" onclick="closeCompareView()">✕ Salir</button>
+    <div class="compare-title" id="compare-title"></div>
+    <div class="compare-cols" id="compare-cols"></div>
+  </div>
+</div>
 <script>
 // ================================================================
 // ACCESO — los códigos están hasheados (SHA-256), no son legibles
@@ -1075,10 +1111,13 @@ function renderCard(d){
       ${d.infoDiff?`<button class="info-tab-btn" id="info-tab-diff" onclick="setInfoTab('diff')">Cómo diferenciarlo</button>`:''}
     </div>`:'';
   document.getElementById('histo-wrap').innerHTML=`
-    <div class="histo-img-box" style="position:relative">
-      <button id="histo-fav-btn" onclick="histoToggleFav()" title="Marcar imagen como favorita">♡</button>
-      <img id="histo-main-img" src="${himgs[0]}" alt="Imagen histológica" style="cursor:zoom-in" onclick="openLightboxArr(getImgs(histoCycle.id),histoCycle.idx)">
-      <div class="histo-img-footer">${counterTxt}${navBtns}</div>
+    <div class="histo-img-col">
+      <div class="histo-img-box" style="position:relative">
+        <button id="histo-fav-btn" onclick="histoToggleFav()" title="Marcar imagen como favorita">♡</button>
+        <img id="histo-main-img" src="${himgs[0]}" alt="Imagen histológica" style="cursor:zoom-in" onclick="openLightboxArr(getImgs(histoCycle.id),histoCycle.idx)">
+        <div class="histo-img-footer">${counterTxt}${navBtns}</div>
+      </div>
+      <button class="histo-compare-btn" onclick="openComparePicker()">⇄ Comparar</button>
     </div>
     <div class="histo-info-col">${infoTabs}<div class="histo-info-wrap"><div class="histo-info" id="info-text" onscroll="updateHistoScrollBar()"></div><div class="histo-scroll-track" id="histo-scroll-track"><div class="histo-scroll-thumb" id="histo-scroll-thumb"></div></div></div><div class="info-scroll-hint" id="info-scroll-hint" style="display:none">▾ Desliza para ver más ▾</div></div>`;
   renderInfoTab();
@@ -1165,6 +1204,90 @@ function histoUpdateFavBtn(){
   btn.textContent=fav?'♥':'♡';
   btn.classList.toggle('active',fav);
 }
+// COMPARAR ENFERMEDADES
+let cmpB=null;
+const cmpCycle={a:{idx:0},b:{idx:0}};
+let cmpTab={a:'completo',b:'completo'};
+
+function openComparePicker(){
+  if(!cur)return;
+  document.getElementById('compare-search').value='';
+  renderComparePicker();
+  document.getElementById('compare-picker-modal').classList.add('open');
+}
+function closeComparePicker(){
+  document.getElementById('compare-picker-modal').classList.remove('open');
+}
+function renderComparePicker(){
+  const q=norm(document.getElementById('compare-search').value||'');
+  const list=document.getElementById('compare-picker-list');
+  list.innerHTML='';
+  diseases.filter(d=>d.id!==cur.id&&(!q||norm(d.name).includes(q)||norm(d.organ).includes(q))).forEach(d=>{
+    const div=document.createElement('div');
+    div.className='disease-item';
+    div.innerHTML=`<span class="dname">${d.name}</span><span class="organ-tag">${d.organ}</span>`;
+    div.onclick=()=>pickCompareDisease(d);
+    list.appendChild(div);
+  });
+}
+function pickCompareDisease(d){
+  cmpB=d;
+  cmpCycle.a.idx=histoCycle.idx;
+  cmpCycle.b.idx=0;
+  cmpTab.a=infoTab;
+  cmpTab.b='completo';
+  closeComparePicker();
+  renderCompareView();
+  document.getElementById('compare-modal').classList.add('open');
+}
+function closeCompareView(){
+  document.getElementById('compare-modal').classList.remove('open');
+  cmpB=null;
+}
+function cmpInfoText(d,tab){
+  let eff=tab;
+  if(eff==='micro'&&!d.infoMicro)eff='completo';
+  return eff==='micro'?d.infoMicro:(d.info||'');
+}
+function renderCompareCol(side,d){
+  const imgs=getImgs(d.id);
+  const idx=cmpCycle[side].idx%imgs.length;
+  const hasMulti=imgs.length>1;
+  const nav=hasMulti?`<div class="histo-nav"><button class="histo-cycle-btn" onclick="cmpCycleImg('${side}',-1)">&#8592;</button><button class="histo-cycle-btn" onclick="cmpCycleImg('${side}',1)">&#8594;</button></div>`:'';
+  const counter=hasMulti?`${idx+1}/${imgs.length}`:'';
+  const tabs=d.infoMicro?`<div class="info-tab-btns">
+      <button class="info-tab-btn${cmpTab[side]==='completo'?' active':''}" onclick="cmpSetTab('${side}','completo')">Completo</button>
+      <button class="info-tab-btn${cmpTab[side]==='micro'?' active':''}" onclick="cmpSetTab('${side}','micro')">En la micro</button>
+    </div>`:'';
+  return `<div class="compare-col">
+      <h4>${d.name}</h4>
+      <div class="tags" style="margin-bottom:8px"><span class="tag tag-system">${d.system}</span><span class="tag tag-organ">${d.organ}</span></div>
+      <div class="histo-img-box" style="flex:none;margin-bottom:10px">
+        <img id="cmp-img-${side}" src="${imgs[idx]}" alt="Imagen histológica" onclick="openLightboxArr(getImgs('${d.id}'),${idx})">
+        <div class="histo-img-footer"><span>${counter}</span>${nav}</div>
+      </div>
+      ${tabs}
+      <div class="histo-info" id="cmp-text-${side}" style="max-height:220px"></div>
+    </div>`;
+}
+function renderCompareView(){
+  if(!cur||!cmpB)return;
+  document.getElementById('compare-title').textContent=`Comparando: ${cur.name}  vs.  ${cmpB.name}`;
+  document.getElementById('compare-cols').innerHTML=renderCompareCol('a',cur)+renderCompareCol('b',cmpB);
+  document.getElementById('cmp-text-a').textContent=cmpInfoText(cur,cmpTab.a);
+  document.getElementById('cmp-text-b').textContent=cmpInfoText(cmpB,cmpTab.b);
+}
+function cmpCycleImg(side,dir){
+  const d=side==='a'?cur:cmpB;
+  const imgs=getImgs(d.id);
+  cmpCycle[side].idx=(cmpCycle[side].idx+dir+imgs.length)%imgs.length;
+  renderCompareView();
+}
+function cmpSetTab(side,tab){
+  cmpTab[side]=tab;
+  renderCompareView();
+}
+
 function qzToggleFavOnly(){
   qCfg.favOnly=!qCfg.favOnly;
   try{localStorage.setItem('pato2_quiz_fav_only',qCfg.favOnly?'1':'0');}catch(e){}
