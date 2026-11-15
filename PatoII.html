@@ -698,7 +698,7 @@ html.light .disease-item.active{background:#3b7dd812}
     <button id="lb-close" onclick="closeLightbox()">Cerrar ✕</button>
   </div>
 </div>
-<div id="compare-picker-modal">
+<div id="compare-picker-modal" onclick="if(event.target===this)closeComparePicker()">
   <div id="compare-picker-box">
     <div style="display:flex;align-items:center;justify-content:space-between">
       <h3 style="font-size:.95rem;font-weight:700">Comparar con...</h3>
@@ -708,7 +708,7 @@ html.light .disease-item.active{background:#3b7dd812}
     <div id="compare-picker-list"></div>
   </div>
 </div>
-<div id="compare-modal">
+<div id="compare-modal" onclick="if(event.target===this)closeCompareView()">
   <div id="compare-box">
     <button id="compare-close" onclick="closeCompareView()">✕ Salir</button>
     <div class="compare-title" id="compare-title"></div>
