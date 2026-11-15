@@ -1262,7 +1262,7 @@ function renderCompareCol(side,d){
   return `<div class="compare-col">
       <h4>${d.name}</h4>
       <div class="tags" style="margin-bottom:8px"><span class="tag tag-system">${d.system}</span><span class="tag tag-organ">${d.organ}</span></div>
-      <div class="histo-img-box" style="flex:none;margin-bottom:10px">
+      <div class="histo-img-box" data-side="${side}" style="flex:none;margin-bottom:10px">
         <img id="cmp-img-${side}" src="${imgs[idx]}" alt="Imagen histológica" onclick="openLightboxArr(getImgs('${d.id}'),${idx})">
         <div class="histo-img-footer"><span>${counter}</span>${nav}</div>
       </div>
@@ -1610,6 +1610,35 @@ document.getElementById('histo-wrap').addEventListener('touchend',function(e){
   var dy=e.changedTouches[0].clientY-_hiTy;
   if(Math.abs(dx)>50&&Math.abs(dx)>Math.abs(dy)){
     if(dx<0)nextHistoImg();else prevHistoImg();
+    e.preventDefault();
+  }
+});
+
+// Touch swipe navigation for compare view images (left/right column independently)
+var _cmpTx=0,_cmpTy=0,_cmpMulti=false,_cmpSide=null;
+document.getElementById('compare-cols').addEventListener('touchstart',function(e){
+  var box=e.target.closest('.histo-img-box[data-side]');
+  _cmpSide=box?box.getAttribute('data-side'):null;
+  _cmpMulti=e.touches.length>1;
+  if(e.touches.length===1){_cmpTx=e.touches[0].clientX;_cmpTy=e.touches[0].clientY;}
+},{passive:true});
+document.getElementById('compare-cols').addEventListener('touchmove',function(e){
+  if(!_cmpSide||_cmpMulti)return;
+  if(e.touches.length>1){_cmpMulti=true;return;}
+  var dx=e.touches[0].clientX-_cmpTx;
+  var dy=e.touches[0].clientY-_cmpTy;
+  if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>10)e.preventDefault();
+},{passive:false});
+document.getElementById('compare-cols').addEventListener('touchend',function(e){
+  if(!_cmpSide||_cmpMulti||e.touches.length>0)return;
+  var d=_cmpSide==='a'?cur:cmpB;
+  if(!d)return;
+  var imgs=getImgs(d.id);
+  if(imgs.length<2)return;
+  var dx=e.changedTouches[0].clientX-_cmpTx;
+  var dy=e.changedTouches[0].clientY-_cmpTy;
+  if(Math.abs(dx)>50&&Math.abs(dx)>Math.abs(dy)){
+    cmpCycleImg(_cmpSide,dx<0?1:-1);
     e.preventDefault();
   }
 });
