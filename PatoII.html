@@ -398,9 +398,12 @@ html.light .disease-item.active{background:#3b7dd812}
 .fog-readonly{width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text);min-height:20px}
 .fog-mark-col{flex:1;min-width:0}
 .fog-mark{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-.fog-mark-btn{padding:7px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:inherit;cursor:pointer}
+.fog-mark-btn{padding:7px 12px;border-radius:10px;border:1px solid var(--accent);background:var(--bg);color:var(--accent);font:inherit;font-weight:600;cursor:pointer;transition:.15s}
+.fog-mark-btn:hover{background:var(--accent);color:#fff}
 .fog-mark-btn.on{background:#2e7d32;border-color:#2e7d32;color:#fff}
 .fog-mark-btn.falta.on{background:#c62828;border-color:#c62828}
+.fog-mark-prompt{margin-top:12px;font-size:.84rem;font-weight:600;color:var(--text2)}
+.fog-correct{color:var(--green);font-weight:700}
 .fog-tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:.8rem;font-weight:600;color:#fff;background:#2e7d32}
 .fog-tag.falta{background:#c62828}
 .fog-hint{color:var(--text2);text-align:center;font-size:.9rem;margin:10px 0}
@@ -2433,10 +2436,11 @@ function fogCaseCompare(c, i) {
     + (c.enun ? '<div class="fog-enun">' + fogEsc(c.enun) + '</div>' : '')
     + (c.img ? '<div class="fog-imgs"><img src="' + fogEsc(c.img) + '" alt="" onclick="openLightbox(this.src)"></div>' : '')
     + '<div class="fog-q">Diagnóstico:</div><div class="fog-readonly">' + dx + '</div>'
-    + '<div class="fog-dx">Respuesta correcta: <strong>' + fogEsc(c.dx) + '</strong></div>'
+    + '<div class="fog-dx"><span class="fog-correct">Respuesta correcta:</span> <strong>' + fogEsc(c.dx) + '</strong></div>'
     + '<div class="fog-q">escribe 3 características microscópicas</div><div class="fog-readonly">' + mi + '</div>'
-    + '<div class="fog-dx">Características correctas:<ul class="fog-res-list">'
+    + '<div class="fog-dx">Algunas características:<ul class="fog-res-list">'
     + (c.micro || []).map(function(m) { return '<li>' + fogEsc(m) + '</li>'; }).join('') + '</ul></div>'
+    + '<div class="fog-mark-prompt">' + (c.mark ? '' : '¿Cómo te fue en este caso? Marca una opción:') + '</div>'
     + fogMarkBtns('case', i, c.mark)
     + '</div>';
 }
