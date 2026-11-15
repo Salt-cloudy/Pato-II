@@ -388,7 +388,6 @@ html.light .disease-item.active{background:#3b7dd812}
 .fog-res img{width:160px;flex-shrink:0;border-radius:10px;border:1px solid var(--border);cursor:zoom-in}
 .fog-res-txt{flex:1;min-width:0}
 .fog-res-list{margin:6px 0;padding-left:18px;color:var(--text2);font-size:.92rem}
-.fog-res-you{margin-top:8px;font-size:.9rem;color:var(--text2);border-left:3px solid var(--accent);padding-left:10px}
 .fog-hist{max-width:720px;margin:0 auto 26px;padding-top:14px;border-top:1px solid var(--border)}
 .fog-hist-title{font-weight:700;color:var(--text1);margin-bottom:10px}
 .fog-hist-title span{font-weight:400;color:var(--text2);font-size:.85rem;margin-left:8px}
@@ -2426,14 +2425,20 @@ function fogToggleHide() {
   const cd = document.getElementById('fog-cd');
   if (cd) cd.textContent = fogRun.hideTime ? '' : fogFmt(fogRun.endAt - Date.now());
 }
-function fogCaseRes(c) {
+function fogCaseCompare(c, i) {
   const dx = c.ansDx ? fogEsc(c.ansDx) : 'vacío';
   const mi = c.ansMicro ? fogEsc(c.ansMicro).split(String.fromCharCode(10)).join('<br>') : 'vacío';
-  return '<div class="fog-res">'
-    + (c.img ? '<img src="' + fogEsc(c.img) + '" alt="" onclick="openLightbox(this.src)">' : '')
-    + '<div class="fog-res-txt"><div class="sim-reveal-name">Diagnóstico: ' + fogEsc(c.dx) + '</div>'
-    + '<div class="fog-res-you"><strong>Tu diagnóstico:</strong> ' + dx + '<br><strong>Tus características:</strong> ' + mi + '</div>'
-    + '</div></div>';
+  return '<div class="fog-case">'
+    + '<div class="fog-q">Caso ' + (i + 1) + '</div>'
+    + (c.enun ? '<div class="fog-enun">' + fogEsc(c.enun) + '</div>' : '')
+    + (c.img ? '<div class="fog-imgs"><img src="' + fogEsc(c.img) + '" alt="" onclick="openLightbox(this.src)"></div>' : '')
+    + '<div class="fog-q">Diagnóstico:</div><div class="fog-readonly">' + dx + '</div>'
+    + '<div class="fog-dx">Respuesta correcta: <strong>' + fogEsc(c.dx) + '</strong></div>'
+    + '<div class="fog-q">escribe 3 características microscópicas</div><div class="fog-readonly">' + mi + '</div>'
+    + '<div class="fog-dx">Características correctas:<ul class="fog-res-list">'
+    + (c.micro || []).map(function(m) { return '<li>' + fogEsc(m) + '</li>'; }).join('') + '</ul></div>'
+    + fogMarkBtns('case', i, c.mark)
+    + '</div>';
 }
 function fogAskEntregar() {
   const actions = document.querySelector('#fog-body .sim-actions');
@@ -2457,9 +2462,7 @@ function fogRenderResults() {
   const r = fogRun;
   const done = r.cases.every(function(c) { return !!c.mark; });
   fogBody('<div class="micro-select-title">Respuestas</div>'
-    + r.cases.map(function(c, i) {
-        return '<div class="fog-q">Caso ' + (i + 1) + '</div>' + fogCaseRes(c) + fogMarkBtns('case', i, c.mark);
-      }).join('')
+    + r.cases.map(function(c, i) { return fogCaseCompare(c, i); }).join('')
     + '<p class="fog-hint">' + (done ? '' : 'Marca Domine o Aún me falta en cada caso para terminar.') + '</p>'
     + '<div class="sim-actions"><button class="micro-comenzar-btn"' + (done ? '' : ' disabled') + ' onclick="fogFinish()">Terminar fogueo</button></div>');
 }
